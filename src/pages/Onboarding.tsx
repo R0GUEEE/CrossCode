@@ -256,7 +256,7 @@ export default ({}: OnboardingProps) => {
           <Typography level="h3">Darwin SDK</Typography>
           <Typography level="body-sm">
             CrossCode requires a special swift SDK to build apps for iOS. It can
-            be generated from a copy of Xcode 26 or later. To install it,
+            be generated from a copy of Xcode 27 or later. To install it,
             download Xcode.xip using the link below, click the "Install SDK"
             button, then select the downloaded file. Note that installing the
             SDK will temporarily require a lot of disk space (~11GB) and may

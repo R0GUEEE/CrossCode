@@ -124,7 +124,7 @@ export default () => {
           >
             {darwinSDKVersion === DARWIN_SDK_VERSION
               ? `Version: ${darwinSDKVersion}`
-              : `Unsupported SDK version (${darwinSDKVersion}). Apps may compile, but you may not be able to use newer features (like liquid glass). Please re-install with Xcode 26.`}
+              : `Unsupported SDK version (${darwinSDKVersion}). Apps may compile, but you may not be able to use newer features. Please re-install with Xcode 27.`}
           </Typography>
         )}
       </div>
