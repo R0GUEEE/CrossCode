@@ -8,14 +8,17 @@ import { useLocation, useNavigate } from "react-router";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import SwiftMenu from "../components/SwiftMenu";
 import SDKMenu from "../components/SDKMenu";
-import { XCODE_VERSION } from "../utilities/constants";
+import {
+  XCODE_VERSION,
+  SWIFT_VERSION_PREFIX,
+  SWIFT_VERSION_PREFIXES,
+} from "../utilities/constants";
 import ErrorIcon from "@mui/icons-material/Error";
 import WarningIcon from "@mui/icons-material/Warning";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { useToast } from "react-toast-plus";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { SWIFT_VERSION_PREFIX } from "../utilities/constants";
 
 export interface OnboardingProps {}
 
@@ -244,9 +247,9 @@ export default ({}: OnboardingProps) => {
         <Card variant="soft">
           <Typography level="h3">Swift</Typography>
           <Typography level="body-sm">
-            You will need a Swift {SWIFT_VERSION_PREFIX} toolchain to use
-            CrossCode. It is recommended to install it using swiftly, but you
-            can also install it manually.
+            You will need a Swift {SWIFT_VERSION_PREFIXES.join(" or ")}{" "}
+            toolchain to use CrossCode. It is recommended to install it using
+            swiftly, but you can also install it manually.
           </Typography>
           <Divider />
           <CardContent>

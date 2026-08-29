@@ -11,7 +11,11 @@ import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import ErrorIcon from "@mui/icons-material/Error";
 import { invoke } from "@tauri-apps/api/core";
-import { SWIFT_VERSION_PREFIX } from "../utilities/constants";
+import {
+  SWIFT_VERSION_PREFIX,
+  SWIFT_VERSION_PREFIXES,
+  isSupportedSwiftVersion,
+} from "../utilities/constants";
 
 export default () => {
   const {
@@ -95,8 +99,9 @@ export default () => {
           >
             swiftly install {SWIFT_VERSION_PREFIX}
           </span>
-          " or manually. If you have already done so, but it is not showing up,
-          your toolchain installation may be broken. For help, refer to the{" "}
+          " (or 6.4 for the Swift 6.4 snapshot) or manually. If you have
+          already done so, but it is not showing up, your toolchain
+          installation may be broken. For help, refer to the{" "}
           <Link
             href="#"
             onClick={(e) => {
@@ -113,8 +118,8 @@ export default () => {
       )}
       {selectedToolchain !== null && !isCompatable(selectedToolchain) && (
         <Typography level="body-md" color="danger">
-          Your selected toolchain is not compatible. Please select a swift{" "}
-          {SWIFT_VERSION_PREFIX}
+          Your selected toolchain is not compatible. Please select a Swift{" "}
+          {SWIFT_VERSION_PREFIXES.join(" or ")}
           toolchain.
         </Typography>
       )}
@@ -205,7 +210,7 @@ export default () => {
 
 export function isCompatable(toolchain: Toolchain | null): boolean {
   if (!toolchain) return false;
-  return toolchain.version.startsWith(SWIFT_VERSION_PREFIX);
+  return isSupportedSwiftVersion(toolchain.version);
 }
 
 function stringifyToolchain(toolchain: Toolchain | null): string | null {

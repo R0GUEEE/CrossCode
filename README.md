@@ -14,7 +14,7 @@
 
 iOS Swift development IDE for Windows/Linux. Create, build, and test apps without owning a Mac.
 
-Supports Swift 6.3 and the Swift Package Manager.
+Supports Swift 6.3 (and Swift 6.4, incl. Xcode 27.0 betas) and the Swift Package Manager.
 
 ### Demo
 
