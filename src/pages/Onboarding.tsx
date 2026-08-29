@@ -8,6 +8,7 @@ import { useLocation, useNavigate } from "react-router";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import SwiftMenu from "../components/SwiftMenu";
 import SDKMenu from "../components/SDKMenu";
+import { XCODE_VERSION } from "../utilities/constants";
 import ErrorIcon from "@mui/icons-material/Error";
 import WarningIcon from "@mui/icons-material/Warning";
 import { getVersion } from "@tauri-apps/api/app";
@@ -256,7 +257,7 @@ export default ({}: OnboardingProps) => {
           <Typography level="h3">Darwin SDK</Typography>
           <Typography level="body-sm">
             CrossCode requires a special swift SDK to build apps for iOS. It can
-            be generated from a copy of Xcode 27 or later. To install it,
+            be generated from a copy of Xcode {XCODE_VERSION} or later. To install it,
             download Xcode.xip using the link below, click the "Install SDK"
             button, then select the downloaded file. Note that installing the
             SDK will temporarily require a lot of disk space (~11GB) and may

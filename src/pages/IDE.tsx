@@ -25,7 +25,7 @@ import { restartServer } from "../utilities/lsp-client";
 import BottomBar from "../components/Tiles/BottomBar";
 import { open as openFileDialog, save } from "@tauri-apps/plugin-dialog";
 import { IStandaloneCodeEditor } from "@codingame/monaco-vscode-api/vscode/vs/editor/standalone/browser/standaloneCodeEditor";
-import { DARWIN_SDK_VERSION } from "../utilities/constants";
+import { MIN_DARWIN_SDK_VERSION, isSupportedSDKVersion } from "../utilities/constants";
 import { writeFile } from "@tauri-apps/plugin-fs";
 
 export interface IDEProps {}
@@ -390,7 +390,7 @@ export default () => {
       {initialized &&
         selectedToolchain !== null &&
         hasIgnoredDarwinSDK === false &&
-        darwinSDKVersion !== DARWIN_SDK_VERSION && (
+        !isSupportedSDKVersion(darwinSDKVersion) && (
           <Modal
             open={true}
             onClose={() => {
@@ -408,9 +408,9 @@ export default () => {
                 </div>
                 <Typography level="body-lg">
                   This version of CrossCode is designed to work with Darwin SDK{" "}
-                  {DARWIN_SDK_VERSION}, but you have version {darwinSDKVersion}{" "}
-                  installed. Things may still work, but you will miss out on
-                  newer features (like liquid glass) and may run into issues.
+                  {MIN_DARWIN_SDK_VERSION} or later, but you have version{" "}
+                  {darwinSDKVersion} installed. Things may still work, but you
+                  will miss out on newer features and may run into issues.
                 </Typography>
               </div>
 

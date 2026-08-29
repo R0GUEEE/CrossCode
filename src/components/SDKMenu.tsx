@@ -7,7 +7,10 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { installSdkOperation } from "../utilities/operations";
 import ErrorIcon from "@mui/icons-material/Error";
 import WarningIcon from "@mui/icons-material/Warning";
-import { DARWIN_SDK_VERSION } from "../utilities/constants";
+import {
+  XCODE_VERSION,
+  isSupportedSDKVersion,
+} from "../utilities/constants";
 
 export default () => {
   const {
@@ -119,12 +122,12 @@ export default () => {
           <Typography
             level="body-sm"
             color={
-              darwinSDKVersion === DARWIN_SDK_VERSION ? undefined : "warning"
+              isSupportedSDKVersion(darwinSDKVersion) ? undefined : "warning"
             }
           >
-            {darwinSDKVersion === DARWIN_SDK_VERSION
+            {isSupportedSDKVersion(darwinSDKVersion)
               ? `Version: ${darwinSDKVersion}`
-              : `Unsupported SDK version (${darwinSDKVersion}). Apps may compile, but you may not be able to use newer features. Please re-install with Xcode 27.`}
+              : `Unsupported SDK version (${darwinSDKVersion}). It is older than the minimum supported version (26.5). Please re-install with Xcode ${XCODE_VERSION} or later.`}
           </Typography>
         )}
       </div>
@@ -139,11 +142,11 @@ export default () => {
           onClick={(e) => {
             e.preventDefault();
             openUrl(
-              "https://developer.apple.com/services-account/download?path=/Developer_Tools/Xcode_26/Xcode_26_Universal.xip"
+              "https://developer.apple.com/services-account/download?path=/Developer_Tools/Xcode_26/Xcode_26.6_Universal.xip"
             );
           }}
         >
-          Download XCode 26
+          Download XCode {XCODE_VERSION}
         </Button>
         <Button
           variant="soft"
