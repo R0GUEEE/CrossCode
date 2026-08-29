@@ -10,7 +10,6 @@ import SwiftMenu from "../components/SwiftMenu";
 import SDKMenu from "../components/SDKMenu";
 import {
   XCODE_VERSION,
-  SWIFT_VERSION_PREFIX,
   SWIFT_VERSION_PREFIXES,
 } from "../utilities/constants";
 import ErrorIcon from "@mui/icons-material/Error";
