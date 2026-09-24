@@ -27,6 +27,7 @@ import { open as openFileDialog, save } from "@tauri-apps/plugin-dialog";
 import { IStandaloneCodeEditor } from "@codingame/monaco-vscode-api/vscode/vs/editor/standalone/browser/standaloneCodeEditor";
 import { MIN_DARWIN_SDK_VERSION, isSupportedSDKVersion } from "../utilities/constants";
 import { writeFile } from "@tauri-apps/plugin-fs";
+import UIBuilder from "../ui-builder/UIBuilder";
 
 export interface IDEProps {}
 
@@ -57,6 +58,8 @@ export default () => {
     darwinSDKVersion,
     screenshot,
     setScreenshot,
+    uiBuilderOpen,
+    setUIBuilderOpen,
   } = useIDE();
   const [sourcekitStartup, setSourcekitStartup] = useStore<boolean | null>(
     "sourcekit/startup",
@@ -200,8 +203,27 @@ export default () => {
       openFile: selectFile,
       undo: undo ?? (() => {}),
       redo: redo ?? (() => {}),
+      toggleUIBuilder: () => setUIBuilderOpen((open) => !open),
     });
-  }, [saveFile, openFolderDialog, navigate, selectFile, undo, redo]);
+  }, [
+    saveFile,
+    openFolderDialog,
+    navigate,
+    selectFile,
+    undo,
+    redo,
+    setUIBuilderOpen,
+  ]);
+
+  // the editor keeps most of the width; the optional panels split the rest
+  const paneSizes = (() => {
+    const editorShare = screenshot ? 50 : 80;
+    const builderShare = Math.round(editorShare * 0.45);
+    if (uiBuilderOpen && screenshot) return [20, editorShare - builderShare, builderShare, 30];
+    if (uiBuilderOpen) return [20, editorShare - builderShare, builderShare];
+    if (screenshot) return [20, editorShare, 30];
+    return [20, editorShare];
+  })();
 
   return (
     <div className="ide-container">
@@ -209,7 +231,7 @@ export default () => {
       <Splitter
         gutterTheme={theme === "dark" ? GutterTheme.Dark : GutterTheme.Light}
         direction={SplitDirection.Horizontal}
-        initialSizes={screenshot ? [20, 50, 30] : [20, 80]}
+        initialSizes={paneSizes}
       >
         <Tile className="file-explorer-tile">
           <FileExplorer openFolder={path} setOpenFile={openNewFile} />
@@ -231,6 +253,15 @@ export default () => {
           />
           <BottomBar />
         </Splitter>
+        {uiBuilderOpen && (
+          <div className="ui-builder-tile">
+            <UIBuilder
+              projectPath={path}
+              openNewFile={openNewFile}
+              onClose={() => setUIBuilderOpen(false)}
+            />
+          </div>
+        )}
         {screenshot && (
           <div className="screenshot-tile">
             <div>

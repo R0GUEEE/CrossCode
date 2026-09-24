@@ -57,6 +57,9 @@ jobs:
       - name: Install frontend dependencies
         run: bun i --frozen-lockfile
 
+      - name: UI builder codegen tests
+        run: bun test src/ui-builder
+
       - name: Clean old bundles
         run: bunx rimraf src-tauri/target/release/bundle
 

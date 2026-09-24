@@ -44,3 +44,15 @@
   object-fit: contain;
   display: block;
 }
+
+.ui-builder-tile {
+  padding: 0;
+  margin: var(--padding-md);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  width: calc(100% - var(--padding-md) * 2);
+  min-width: 0;
+}

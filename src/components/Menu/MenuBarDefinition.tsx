@@ -176,6 +176,15 @@ export default [
         ],
       },
       {
+        label: "Panels",
+        items: [
+          {
+            name: "UI Builder",
+            callbackName: "toggleUIBuilder",
+          },
+        ],
+      },
+      {
         label: "Debug",
         items: [
           {

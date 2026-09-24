@@ -1,0 +1,342 @@
+.uib-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.uib-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--padding-sm);
+  flex-wrap: wrap;
+  padding-bottom: var(--padding-xs);
+  border-bottom: 1px solid var(--joy-palette-divider);
+}
+
+.uib-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--padding-xs);
+  flex-wrap: wrap;
+}
+
+.uib-body {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  gap: var(--padding-xs);
+  padding-top: var(--padding-xs);
+}
+
+.uib-column {
+  display: flex;
+  flex-direction: column;
+  width: 170px;
+  flex: none;
+  min-height: 0;
+  overflow: auto;
+  gap: var(--padding-xs);
+}
+
+.uib-column-right {
+  width: 250px;
+}
+
+.uib-group-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+  margin-bottom: 4px;
+}
+
+/* ------------------------------------------------------------- palette -- */
+
+.uib-palette {
+  display: flex;
+  flex-direction: column;
+  gap: var(--padding-sm);
+}
+
+.uib-palette-item {
+  padding: 4px 8px;
+  border: 1px solid var(--joy-palette-divider);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: grab;
+  user-select: none;
+}
+
+.uib-palette-item:hover {
+  border-color: var(--joy-palette-primary-500);
+  color: var(--joy-palette-primary-500);
+}
+
+.uib-palette-item:active {
+  cursor: grabbing;
+}
+
+/* -------------------------------------------------------------- canvas -- */
+
+.uib-canvas {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: auto;
+  padding: var(--padding-sm);
+  background:
+    linear-gradient(45deg, rgba(128, 128, 128, 0.06) 25%, transparent 25%) -8px 0/16px 16px,
+    linear-gradient(-45deg, rgba(128, 128, 128, 0.06) 25%, transparent 25%) -8px 0/16px 16px,
+    linear-gradient(45deg, transparent 75%, rgba(128, 128, 128, 0.06) 75%) -8px 0/16px 16px,
+    linear-gradient(-45deg, transparent 75%, rgba(128, 128, 128, 0.06) 75%) -8px 0/16px 16px;
+}
+
+.uib-device {
+  width: 360px;
+  min-height: 640px;
+  flex: none;
+  border-radius: 28px;
+  border: 8px solid #1b1b1f;
+  background: #fff;
+  color: #1c1c1e;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.uib-statusbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 12px;
+  font-size: 11px;
+  color: #6e6e73;
+  background: #f7f7fa;
+}
+
+.uib-screen {
+  flex: 1 1 0;
+  padding: 8px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.uib-homebar {
+  height: 14px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f7f7fa;
+}
+
+.uib-homebar::after {
+  content: "";
+  width: 96px;
+  height: 4px;
+  border-radius: 2px;
+  background: #c7c7cc;
+}
+
+/* --------------------------------------------------------------- nodes -- */
+
+.uib-node {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  min-width: 0;
+}
+
+.uib-node-container {
+  border-color: rgba(0, 122, 255, 0.25);
+  border-style: dashed;
+}
+
+.uib-node:hover {
+  border-color: rgba(0, 122, 255, 0.6);
+}
+
+.uib-node-selected {
+  border-color: var(--joy-palette-primary-500) !important;
+  border-style: solid !important;
+}
+
+.uib-node-tag {
+  position: absolute;
+  top: -9px;
+  left: 2px;
+  font-size: 9px;
+  line-height: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--joy-palette-primary-500);
+  color: #fff;
+  display: none;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.uib-node:hover > .uib-node-tag,
+.uib-node-selected > .uib-node-tag {
+  display: block;
+}
+
+.uib-node-unknown {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #b00020;
+  border: 1px solid #b00020;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------- inspector -- */
+
+.uib-inspector,
+.uib-tree-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--padding-xs);
+}
+
+.uib-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--joy-palette-divider);
+  border-radius: 8px;
+  padding: var(--padding-sm);
+}
+
+.uib-field {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.uib-field > label {
+  grid-column: 1 / -1;
+  opacity: 0.75;
+}
+
+.uib-field input[type="text"],
+.uib-field input[type="number"],
+.uib-field select {
+  grid-column: 1 / -1;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--joy-palette-divider);
+  border-radius: 5px;
+}
+
+.uib-hint {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  opacity: 0.6;
+  line-height: 1.35;
+}
+
+.uib-hint-warn {
+  color: var(--joy-palette-danger-500);
+  opacity: 1;
+}
+
+.uib-node-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ---------------------------------------------------------------- tree -- */
+
+.uib-tree {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--joy-palette-divider);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.uib-tree-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.uib-tree-row:hover {
+  background: var(--joy-palette-neutral-100);
+}
+
+.uib-tree-row-selected {
+  background: var(--joy-palette-primary-100);
+}
+
+.uib-tree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uib-tree-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+}
+
+.uib-tree-row:hover .uib-tree-actions,
+.uib-tree-row-selected .uib-tree-actions {
+  opacity: 1;
+}
+
+.uib-tree-actions > button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 3px;
+  border-radius: 3px;
+}
+
+.uib-tree-actions > button:hover {
+  background: var(--joy-palette-neutral-200);
+}
+
+/* ---------------------------------------------------------------- code -- */
+
+.uib-code {
+  flex: none;
+  max-height: 38%;
+  overflow: auto;
+  border-top: 1px solid var(--joy-palette-divider);
+  padding-top: var(--padding-xs);
+  margin-top: var(--padding-xs);
+}
+
+.uib-code > pre {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+}

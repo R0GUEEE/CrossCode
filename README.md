@@ -32,6 +32,7 @@ Check out the [Getting Started](https://github.com/nab138/CrossCode/wiki#getting
 
 - Generate a Darwin SDK for linux from a user provided copy of the latest Xcode (e.g. Xcode 27.0) to build the apps
 - Build apps using swift package manager
+- Visual SwiftUI builder: assemble views on a canvas, edit their properties, and generate the SwiftUI source
 - Log in with your Apple ID to sign apps
 - Install apps on device
 - Create projects from templates
@@ -52,6 +53,25 @@ Please note that I am one person, so development may be slow. If you want to hel
 - A darwin SDK is generated from a user provided copy of the latest Xcode (e.g. Xcode 27.0; extracted with [unxip-rs](https://github.com/nab138/unxip-rs)), the darwin tools from [darwin-tools-linux-llvm](https://github.com/xtool-org/darwin-tools-linux-llvm) (currently v1.1.0), and the macro server from [OpenAppleMacros](https://github.com/xtool-org/OpenAppleMacros) (currently v1.3.0), which is what makes Apple's SwiftUI/Previews/FoundationModels macros usable on Linux.
 - Swift uses the darwin SDK to build an executable which is packaged into an .app bundle.
 - The code to sign and install apps onto a device has been removed from CrossCode's source and moved to a standalone package, [isideload](https://github.com/nab138/isideload). It was built on a lot of other libraries, so check out its README for more info.
+
+## UI Builder
+
+`View -> Panels -> UI Builder` opens a visual editor for SwiftUI views next to
+the code editor:
+
+- drag components from the palette onto the canvas (or click to append them),
+- select a view to edit its properties, bindings and modifiers in the inspector,
+- reorder, duplicate or delete views in the structure tree, and
+- watch the generated SwiftUI code update live.
+
+`Save <View>.swift` writes the result to `<project>/Sources/<View>.swift`, which
+`Open in Editor` then opens in Monaco. The layout itself is stored in the
+project as `.crosscode/ui-builder.json` (the same folder that keeps your open
+tabs), so it survives restarts. Controls that need state (Toggle, TextField,
+Slider, ...) declare their `@State` variables automatically.
+
+The canvas is a preview approximation, not a simulator; build the app to see
+the real thing on a device.
 
 ## Credits
 
