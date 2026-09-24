@@ -1,10 +1,31 @@
 use std::{
     collections::HashSet,
     fs::{self, read_link},
-    io::ErrorKind,
-    os::unix::fs::symlink,
+    io::{self, ErrorKind},
     path::{Component, Path},
 };
+
+#[cfg(target_family = "unix")]
+fn create_symlink(target: &Path, dst: &Path, _src: &Path) -> io::Result<()> {
+    std::os::unix::fs::symlink(target, dst)
+}
+
+#[cfg(target_family = "windows")]
+fn create_symlink(target: &Path, dst: &Path, src: &Path) -> io::Result<()> {
+    if fs::metadata(src).map(|metadata| metadata.is_dir()).unwrap_or(false) {
+        std::os::windows::fs::symlink_dir(target, dst)
+    } else {
+        std::os::windows::fs::symlink_file(target, dst)
+    }
+}
+
+#[cfg(not(any(target_family = "unix", target_family = "windows")))]
+fn create_symlink(_target: &Path, _dst: &Path, _src: &Path) -> io::Result<()> {
+    Err(io::Error::new(
+        ErrorKind::Unsupported,
+        "symbolic links are unsupported on this platform",
+    ))
+}
 
 #[derive(Debug, Clone)]
 struct SDKEntry {
@@ -196,7 +217,8 @@ pub fn copy_developer(
                 fs::create_dir_all(parent)
                     .map_err(|e| format!("Failed to create parent dir: {}", e))?;
             }
-            symlink(&target, &dst_path).map_err(|e| format!("Failed to create symlink: {}", e))?;
+            create_symlink(&target, &dst_path, &src_path)
+                .map_err(|e| format!("Failed to create symlink: {}", e))?;
         } else if metadata.is_dir() {
             fs::create_dir_all(&dst_path).map_err(|e| format!("Failed to create dir: {}", e))?;
             copy_developer(&src_path, dst, &rel_path, has_crossed_device)?;
