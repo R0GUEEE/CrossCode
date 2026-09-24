@@ -55,6 +55,44 @@ pub fn symlink(target: &str, link: &str) -> std::io::Result<()> {
     }
 }
 
+/// Make `path` executable, going through WSL when running on Windows (the file
+/// lives on the Linux filesystem there, so the Windows API cannot chmod it).
+pub fn set_executable(path: &str) -> Result<(), String> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let metadata = fs::metadata(path)
+            .map_err(|e| format!("Failed to read metadata for '{}': {}", path, e))?;
+        let mut perms = metadata.permissions();
+        perms.set_mode(perms.mode() | 0o755);
+        fs::set_permissions(path, perms)
+            .map_err(|e| format!("Failed to set permissions for '{}': {}", path, e))
+    }
+    #[cfg(target_os = "windows")]
+    {
+        if !has_wsl() {
+            return Err("WSL is not available".to_string());
+        }
+        let linux = windows_to_wsl_path(path)?;
+        let output = Command::new("wsl")
+            .arg("chmod")
+            .arg("+x")
+            .arg(&linux)
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map_err(|e| format!("Failed to run chmod: {}", e))?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(format!(
+                "Failed to make '{}' executable: {}",
+                path,
+                String::from_utf8_lossy(&output.stderr).trim()
+            ))
+        }
+    }
+}
+
 pub fn linux_env(key: &str) -> Result<String, String> {
     #[cfg(not(target_os = "windows"))]
     {

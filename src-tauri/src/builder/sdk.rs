@@ -8,7 +8,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use tauri::{AppHandle, Manager, Window};
 
-use crate::builder::crossplatform::{linux_path, linux_temp_dir, remove_dir_all, symlink};
+use crate::builder::crossplatform::{
+    linux_path, linux_temp_dir, remove_dir_all, set_executable, symlink,
+};
 use crate::builder::swift::{validate_toolchain, SwiftBin};
 use crate::operation::Operation;
 use tauri::path::BaseDirectory;
@@ -24,7 +26,137 @@ use std::os::windows::process::CommandExt;
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-const DARWIN_TOOLS_VERSION: &str = "1.0.1";
+/// Toolset release from https://github.com/xtool-org/darwin-tools-linux-llvm.
+/// Keep in sync with xtool's `SDKBuilder.darwinToolsVersion`.
+const DARWIN_TOOLS_VERSION: &str = "1.1.0";
+
+/// Release from https://github.com/xtool-org/OpenAppleMacros, which provides
+/// implementations for the macros that only exist in Apple's (macOS-only)
+/// toolchain (SwiftUI/Previews/FoundationModels macros).
+/// Keep in sync with xtool's `SDKBuilder.oamVersion`.
+const OPEN_APPLE_MACROS_VERSION: &str = "1.3.0";
+
+/// Keep in sync with xtool's `SDKBuilder.oamLibraries`.
+const OPEN_APPLE_MACROS_LIBRARIES: [&str; 3] = [
+    "FoundationModelsMacros",
+    "PreviewsMacros",
+    "SwiftUIMacros",
+];
+
+/// Bump this whenever the layout/content of the generated bundle changes, so
+/// tools that cache a darwin SDK by this string rebuild it.
+/// Mirrors xtool's `SDKBuilder.sdkEpoch`.
+const SDK_EPOCH: u32 = 2;
+
+/// Linux architecture of the machine that the built SDK runs on (or of WSL,
+/// when running on Windows).
+fn toolset_arch() -> Result<&'static str, String> {
+    if cfg!(target_arch = "x86_64") {
+        Ok("x86_64")
+    } else if cfg!(target_arch = "aarch64") {
+        Ok("aarch64")
+    } else {
+        Err("Unsupported architecture".to_string())
+    }
+}
+
+/// Value written to `darwin-sdk-version.txt`. Same shape as xtool's
+/// `SDKBuilder.currentSDKVersion`.
+fn darwin_sdk_version() -> String {
+    format!(
+        "epoch={},darwinTools={},oam={}",
+        SDK_EPOCH, DARWIN_TOOLS_VERSION, OPEN_APPLE_MACROS_VERSION
+    )
+}
+
+/// lld has no `-r` (merge object files) mode, but SPM's SwiftBuild backend uses
+/// it on Darwin. We therefore install a shell trampoline as `ld64.lld` that
+/// redirects `-r` invocations to `llvm-lib` and forwards everything else to the
+/// real linker (`bin/orig/ld64.lld`). Taken from xtool.
+///
+/// Stored line by line so the generated script never inherits the line endings
+/// of the checkout.
+const LD64_TRAMPOLINE: &[&str] = &[
+    "#!/bin/sh",
+    "",
+    "set -eu",
+    "",
+    "case \"$0\" in",
+    "    */*) script_path=\"$0\" ;;",
+    "    *) script_path=\"$(command -v \"$0\")\" ;;",
+    "esac",
+    "case \"$script_path\" in",
+    "    /*) script_dir=\"${script_path%/*}\"; [ -n \"$script_dir\" ] || script_dir=\"/\" ;;",
+    "    */*) script_dir=\"${script_path%/*}\" ;;",
+    "    *) script_dir=\".\" ;;",
+    "esac",
+    "bin_dir=\"$(CDPATH= cd -P \"$script_dir\" && pwd -P)\"",
+    "",
+    "find_argument_value() {",
+    "    argument_name=\"$1\"",
+    "    shift",
+    "",
+    "    while [ \"$#\" -gt 0 ]; do",
+    "        if [ \"$1\" = \"$argument_name\" ]; then",
+    "            shift",
+    "            if [ \"$#\" -gt 0 ]; then",
+    "                argument_value=\"$1\"",
+    "                return 0",
+    "            fi",
+    "            return 1",
+    "        fi",
+    "        shift",
+    "    done",
+    "",
+    "    return 1",
+    "}",
+    "",
+    "relocatable=",
+    "for argument do",
+    "    if [ \"$argument\" = \"-r\" ]; then",
+    "        relocatable=1",
+    "    fi",
+    "done",
+    "",
+    "if [ -n \"$relocatable\" ]; then",
+    "    missing_argument=",
+    "",
+    "    if find_argument_value -filelist \"$@\"; then",
+    "        filelist=\"$argument_value\"",
+    "    else",
+    "        missing_argument=1",
+    "    fi",
+    "    if find_argument_value -dependency_info \"$@\"; then",
+    "        dependency_info=\"$argument_value\"",
+    "    else",
+    "        missing_argument=1",
+    "    fi",
+    "    if find_argument_value -o \"$@\"; then",
+    "        output=\"$argument_value\"",
+    "    else",
+    "        missing_argument=1",
+    "    fi",
+    "",
+    "    if [ -n \"$missing_argument\" ]; then",
+    "        echo \"ld64.lld trampoline could not process arguments.\" >&2",
+    "        echo \"Please file an issue at https://github.com/nab138/CrossCode/issues\" >&2",
+    "        echo \"  Arguments: $@\" >&2",
+    "        exit 2",
+    "    fi",
+    "",
+    "    exec \"$bin_dir/llvm-lib\" -static \\",
+    "        -filelist \"$filelist\" \\",
+    "        -dependency_info \"$dependency_info\" \\",
+    "        -o \"$output\"",
+    "fi",
+    "",
+    "exec \"$bin_dir/orig/ld64.lld\" \"$@\"",
+    "",
+];
+
+fn ld64_trampoline() -> String {
+    LD64_TRAMPOLINE.join("\n")
+}
 
 #[tauri::command]
 pub async fn install_sdk_operation(
@@ -129,6 +261,13 @@ async fn install_sdk_internal(
     op.move_on("create_stage", "install_toolset")?;
     op.fail_if_err("install_toolset", install_toolset(&output_dir).await)?;
     op.complete("install_toolset")?;
+
+    // Apple's macro implementations only exist in the macOS toolchain, so we
+    // ship xtool's OpenAppleMacros server instead (see `install_macros`).
+    op.start("install_macros")?;
+    op.fail_if_err("install_macros", install_macros(&output_dir).await)?;
+    op.complete("install_macros")?;
+
     let dev = install_developer(app, &output_dir, &xcode_path, is_dir, op).await?;
     op.start("write_metadata")?;
 
@@ -163,8 +302,12 @@ async fn install_sdk_internal(
     \"linker\": {
         \"path\": \"ld64.lld\"
     },
+    \"librarian\": {
+        \"path\": \"llvm-lib\"
+    },
     \"swiftCompiler\": {
         \"extraCLIOptions\": [
+            \"-Xfrontend\", \"-enable-cross-import-overlays\",
             \"-use-ld=lld\"
         ]
     }
@@ -173,6 +316,26 @@ async fn install_sdk_internal(
         "write_metadata",
         fs::write(output_dir.join("toolset.json"), toolset),
         |e| format!("Failed to write toolset.json: {}", e),
+    )?;
+
+    // Same toolset, but for the SwiftBuild build system: it derives the linker
+    // and librarian paths itself, so it must not be given extra compiler flags.
+    // It needs Swift 6.4+ (6.3 has bugs resolving those paths) — this is the
+    // toolset flavour xtool writes as `toolset-swb.json`.
+    let toolset_swb = "{
+    \"schemaVersion\": \"1.0\",
+    \"rootPath\": \"toolset/bin\",
+    \"linker\": {
+        \"path\": \"ld64.lld\"
+    },
+    \"librarian\": {
+        \"path\": \"llvm-lib\"
+    }
+}";
+    op.fail_if_err_map(
+        "write_metadata",
+        fs::write(output_dir.join("toolset-swb.json"), toolset_swb),
+        |e| format!("Failed to write toolset-swb.json: {}", e),
     )?;
 
     let sdk_def = SDKDefinition {
@@ -218,7 +381,7 @@ async fn install_sdk_internal(
     let sdk_version_path = output_dir.join("darwin-sdk-version.txt");
     op.fail_if_err_map(
         "write_metadata",
-        fs::write(&sdk_version_path, "develop"),
+        fs::write(&sdk_version_path, darwin_sdk_version()),
         |e| format!("Failed to write darwin-sdk-version.txt: {}", e),
     )?;
     op.move_on("write_metadata", "install_sdk")?;
@@ -270,13 +433,7 @@ async fn install_toolset(output_path: &PathBuf) -> Result<(), String> {
     fs::create_dir_all(&toolset_dir)
         .map_err(|e| format!("Failed to create toolset directory: {}", e))?;
 
-    let arch = if cfg!(target_arch = "x86_64") {
-        "x86_64"
-    } else if cfg!(target_arch = "aarch64") {
-        "aarch64"
-    } else {
-        return Err("Unsupported architecture".to_string());
-    };
+    let arch = toolset_arch()?;
     let toolset_url = format!(
         "https://github.com/xtool-org/darwin-tools-linux-llvm/releases/download/v{}/toolset-{}.tar.gz",
         DARWIN_TOOLS_VERSION, arch
@@ -296,6 +453,9 @@ async fn install_toolset(output_path: &PathBuf) -> Result<(), String> {
     archive
         .unpack(&toolset_dir)
         .map_err(|e| format!("Failed to extract toolset: {}", e))?;
+
+    postprocess_toolset(&toolset_dir)?;
+
     #[cfg(target_os = "windows")]
     {
         // I'm guessing this has to be done because I'm extracting the tar from windows into the wsl file system and windows doesn't play nice with permissions, but im too lazy to do this properly
@@ -314,7 +474,83 @@ async fn install_toolset(output_path: &PathBuf) -> Result<(), String> {
                 String::from_utf8_lossy(&output.stderr)
             ));
         }
+        // the glob above does not cover bin/orig
+        set_executable(
+            &toolset_dir
+                .join("bin/orig/ld64.lld")
+                .to_string_lossy()
+                .to_string(),
+        )?;
     }
+
+    // the trampoline is written by us, so it never gets a mode from the archive
+    set_executable(&ld64_path(&toolset_dir).to_string_lossy().to_string())?;
+    Ok(())
+}
+
+fn ld64_path(toolset_dir: &PathBuf) -> PathBuf {
+    toolset_dir.join("bin").join("ld64.lld")
+}
+
+/// Turn a freshly extracted toolset into one that works with SwiftPM and with
+/// the SwiftBuild system:
+///   * expose the bundled llvm archive tool under the name SwiftBuild expects
+///     (it assumes an Apple-flavored librarian on Apple platforms, but accepts
+///     an explicit `llvm-lib`),
+///   * replace `ld64.lld` with the `-r` trampoline (the real linker is kept as
+///     `bin/orig/ld64.lld`).
+fn postprocess_toolset(toolset_dir: &PathBuf) -> Result<(), String> {
+    let bin = toolset_dir.join("bin");
+    let libtool = bin.join("libtool");
+    let llvm_lib = bin.join("llvm-lib");
+    if libtool.exists() {
+        fs::rename(&libtool, &llvm_lib)
+            .map_err(|e| format!("Failed to rename toolset libtool: {}", e))?;
+    } else if !llvm_lib.exists() {
+        return Err("Toolset is missing bin/libtool".to_string());
+    }
+
+    let ld64 = ld64_path(toolset_dir);
+    let orig_bins = bin.join("orig");
+    let orig_ld64 = orig_bins.join("ld64.lld");
+    fs::create_dir_all(&orig_bins)
+        .map_err(|e| format!("Failed to create toolset bin/orig: {}", e))?;
+    fs::rename(&ld64, &orig_ld64)
+        .map_err(|e| format!("Failed to move toolset ld64.lld: {}", e))?;
+    fs::write(&ld64, ld64_trampoline())
+        .map_err(|e| format!("Failed to write ld64.lld trampoline: {}", e))?;
+    Ok(())
+}
+
+/// Downloads and installs xtool's OpenAppleMacros server into the bundle root.
+/// It is what Apple's `*Macros` modules resolve to on Linux: per-platform
+/// symlinks created in `install_developer` hand it to swiftc as the plugin
+/// server.
+async fn install_macros(output_path: &PathBuf) -> Result<(), String> {
+    let arch = toolset_arch()?;
+    let url = format!(
+        "https://github.com/xtool-org/OpenAppleMacros/releases/download/v{}/OpenAppleMacrosServer-{}",
+        OPEN_APPLE_MACROS_VERSION, arch
+    );
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("Failed to download OpenAppleMacros: {}", e))?;
+    if !response.status().is_success() {
+        return Err(format!(
+            "Failed to download OpenAppleMacros: {}",
+            response.status()
+        ));
+    }
+    let binary = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read OpenAppleMacros response: {}", e))?;
+
+    let server_path = output_path.join("OpenAppleMacrosServer");
+    fs::write(&server_path, &binary)
+        .map_err(|e| format!("Failed to write OpenAppleMacrosServer: {}", e))?;
+    set_executable(&server_path.to_string_lossy().to_string())?;
     Ok(())
 }
 
@@ -483,6 +719,73 @@ async fn install_developer(
                     )
                 },
             )?;
+        }
+
+        // Point the platform's plugin server at the OpenAppleMacros server we
+        // installed in the bundle root, so Apple's macro modules resolve.
+        let platform_dir = dev.join(format!("Platforms/{}.platform", platform));
+        let plugin_bin = platform_dir.join("Developer/usr/bin");
+        op.fail_if_err_map("copy_files", fs::create_dir_all(&plugin_bin), |e| {
+            format!("Failed to create {:?}: {}", plugin_bin, e)
+        })?;
+        let plugin_server = plugin_bin.join("swift-plugin-server");
+        if fs::symlink_metadata(&plugin_server).is_ok() {
+            op.fail_if_err_map("copy_files", fs::remove_file(&plugin_server), |e| {
+                format!("Failed to remove {:?}: {}", plugin_server, e)
+            })?;
+        }
+        op.fail_if_err_map(
+            "copy_files",
+            symlink(
+                "../../../../../../OpenAppleMacrosServer",
+                &plugin_server.to_string_lossy().to_string(),
+            ),
+            |e| format!("Failed to create {:?}: {}", plugin_server, e),
+        )?;
+
+        let host_dir = platform_dir.join("Developer/usr/lib/swift/host");
+        let plugins_dir = host_dir.join("plugins");
+        if fs::symlink_metadata(&plugins_dir).is_ok() {
+            let is_symlink = fs::symlink_metadata(&plugins_dir)
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false);
+            let removed = if is_symlink {
+                fs::remove_file(&plugins_dir).map_err(|e| e.to_string())
+            } else {
+                remove_dir_all(&plugins_dir)
+            };
+            op.fail_if_err_map("copy_files", removed, |e| {
+                format!("Failed to remove {:?}: {}", plugins_dir, e)
+            })?;
+        }
+
+        if platform == "iPhoneSimulator" {
+            // The simulator platform ships no plugins of its own, so mirror the
+            // device ones.
+            op.fail_if_err_map("copy_files", fs::create_dir_all(&host_dir), |e| {
+                format!("Failed to create {:?}: {}", host_dir, e)
+            })?;
+            op.fail_if_err_map(
+                "copy_files",
+                symlink(
+                    "../../../../../../iPhoneOS.platform/Developer/usr/lib/swift/host/plugins",
+                    &plugins_dir.to_string_lossy().to_string(),
+                ),
+                |e| format!("Failed to create {:?}: {}", plugins_dir, e),
+            )?;
+        } else {
+            // Empty stubs: they only need to exist so that swiftc believes the
+            // modules are supported. The real implementations live in the
+            // macro server.
+            op.fail_if_err_map("copy_files", fs::create_dir_all(&plugins_dir), |e| {
+                format!("Failed to create {:?}: {}", plugins_dir, e)
+            })?;
+            for library in OPEN_APPLE_MACROS_LIBRARIES {
+                let stub = plugins_dir.join(format!("lib{}.so", library));
+                op.fail_if_err_map("copy_files", fs::write(&stub, b""), |e| {
+                    format!("Failed to create {:?}: {}", stub, e)
+                })?;
+            }
         }
     }
 

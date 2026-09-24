@@ -14,6 +14,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   SWIFT_VERSION_PREFIX,
   SWIFT_VERSION_PREFIXES,
+  SWIFT_VERSION_SNAPSHOT_PREFIX,
   isSupportedSwiftVersion,
 } from "../utilities/constants";
 
@@ -99,7 +100,8 @@ export default () => {
           >
             swiftly install {SWIFT_VERSION_PREFIX}
           </span>
-          " (or 6.4 for the Swift 6.4 snapshot) or manually. If you have
+          " (or {SWIFT_VERSION_SNAPSHOT_PREFIX} for the Swift{" "}
+          {SWIFT_VERSION_SNAPSHOT_PREFIX} snapshot) or manually. If you have
           already done so, but it is not showing up, your toolchain
           installation may be broken. For help, refer to the{" "}
           <Link
