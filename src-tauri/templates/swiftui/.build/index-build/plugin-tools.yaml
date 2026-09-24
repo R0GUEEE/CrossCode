@@ -1,0 +1,47 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<{{projectName}}-x86_64-unknown-windows-msvc-debug.module>"]
+  "test": ["<{{projectName}}-x86_64-unknown-windows-msvc-debug.module>"]
+  "{{projectName}}-x86_64-unknown-windows-msvc-debug.module": ["<{{projectName}}-x86_64-unknown-windows-msvc-debug.module>"]
+default: "main"
+nodes:
+  "D:\\crosscode\\src-tauri\\templates\\swiftui\\Sources/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+commands:
+  "<{{projectName}}-x86_64-unknown-windows-msvc-debug.module>":
+    tool: phony
+    inputs: ["D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\Modules\\__projectName__.swiftmodule"]
+    outputs: ["<{{projectName}}-x86_64-unknown-windows-msvc-debug.module>"]
+
+  "C.{{projectName}}-x86_64-unknown-windows-msvc-debug.module":
+    tool: shell
+    inputs: ["D:\\crosscode\\src-tauri\\templates\\swiftui\\Sources\\ContentView.swift","D:\\crosscode\\src-tauri\\templates\\swiftui\\Sources\\{{projectName}}.swift","D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\swift-version--319CA7822A0FBD8C.txt","D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\sources"]
+    outputs: ["D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\Modules\\__projectName__.swiftmodule"]
+    description: "Compiling Swift Module '__projectName__' (2 sources)"
+    args: ["D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Toolchains\\6.4.0+Asserts\\usr\\bin\\swiftc.exe","-module-name","__projectName__","-emit-dependencies","-emit-module","-emit-module-path","D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\Modules\\__projectName__.swiftmodule","-output-file-map","D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\output-file-map.json","-incremental","@D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\sources","-I","D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\Modules","-target","x86_64-unknown-windows-msvc","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\index\\store","-Onone","-enable-testing","-j8","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\ModuleCache","-parseable-output","-static","-swift-version","6","-Xfrontend","-experimental-lazy-typecheck","-Xfrontend","-experimental-skip-all-function-bodies","-Xfrontend","-experimental-allow-module-with-compiler-errors","-Xfrontend","-empty-abi-descriptor","-sdk","D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\SDKs\\Windows.sdk","-libc","MD","-I","D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\XCTest-6.4.0\\usr\\lib\\swift\\windows","-I","D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\XCTest-6.4.0\\usr\\lib\\swift\\windows\\x86_64","-L","D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\XCTest-6.4.0\\usr\\lib\\swift\\windows\\x86_64","-I","D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\Testing-6.4.0\\usr\\lib\\swift\\windows","-L","D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\Testing-6.4.0\\usr\\lib\\swift\\windows\\x86_64","-use-ld=lld","-g","-use-ld=lld","-Xcc","-D_MT","-Xcc","-D_DLL","-Xcc","-Xclang","-Xcc","--dependent-lib=msvcrt","-Xcc","-gdwarf","-package-name","swiftui"]
+
+  "D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","D:\\crosscode\\src-tauri\\templates\\swiftui\\Sources\\ContentView.swift","D:\\crosscode\\src-tauri\\templates\\swiftui\\Sources\\{{projectName}}.swift"]
+    outputs: ["D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\sources"]
+    description: "Write auxiliary file D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\sources"
+
+  "D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\swift-version--319CA7822A0FBD8C.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Toolchains\\6.4.0+Asserts\\usr\\bin\\swiftc.exe"]
+    outputs: ["D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\swift-version--319CA7822A0FBD8C.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\swift-version--319CA7822A0FBD8C.txt"
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["D:\\crosscode\\src-tauri\\templates\\swiftui\\Sources/","D:\\crosscode\\src-tauri\\templates\\swiftui\\Package.swift","D:\\crosscode\\src-tauri\\templates\\swiftui\\Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

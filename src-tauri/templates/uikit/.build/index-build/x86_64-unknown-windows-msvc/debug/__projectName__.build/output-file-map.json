@@ -1,0 +1,17 @@
+{
+  "": {
+    "swift-dependencies": "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\primary.swiftdeps"
+  },
+  "D:\\crosscode\\src-tauri\\templates\\uikit\\Sources\\AppDelegate.swift": {
+    "dependencies": "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\AppDelegate.d",
+    "object": "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\AppDelegate.swift.o",
+    "swiftmodule": "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\AppDelegate~partial.swiftmodule",
+    "swift-dependencies": "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\AppDelegate.swiftdeps",
+    "diagnostics": "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\AppDelegate.dia"  },
+  "D:\\crosscode\\src-tauri\\templates\\uikit\\Sources\\RootViewController.swift": {
+    "dependencies": "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\RootViewController.d",
+    "object": "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\RootViewController.swift.o",
+    "swiftmodule": "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\RootViewController~partial.swiftmodule",
+    "swift-dependencies": "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\RootViewController.swiftdeps",
+    "diagnostics": "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\RootViewController.dia"  }
+}

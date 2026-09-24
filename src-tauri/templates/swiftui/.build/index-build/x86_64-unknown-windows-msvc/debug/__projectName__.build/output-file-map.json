@@ -1,0 +1,17 @@
+{
+  "": {
+    "swift-dependencies": "D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\primary.swiftdeps"
+  },
+  "D:\\crosscode\\src-tauri\\templates\\swiftui\\Sources\\ContentView.swift": {
+    "dependencies": "D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\ContentView.d",
+    "object": "D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\ContentView.swift.o",
+    "swiftmodule": "D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\ContentView~partial.swiftmodule",
+    "swift-dependencies": "D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\ContentView.swiftdeps",
+    "diagnostics": "D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\ContentView.dia"  },
+  "D:\\crosscode\\src-tauri\\templates\\swiftui\\Sources\\{{projectName}}.swift": {
+    "dependencies": "D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\{{projectName}}.d",
+    "object": "D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\{{projectName}}.swift.o",
+    "swiftmodule": "D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\{{projectName}}~partial.swiftmodule",
+    "swift-dependencies": "D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\{{projectName}}.swiftdeps",
+    "diagnostics": "D:\\crosscode\\src-tauri\\templates\\swiftui\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\{{projectName}}.dia"  }
+}

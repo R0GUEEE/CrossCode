@@ -373,3 +373,26 @@
   color: var(--joy-palette-danger-700);
   background: var(--joy-palette-danger-50);
 }
+
+.uib-import-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 4px 8px 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--joy-palette-warning-800);
+  background: var(--joy-palette-warning-50);
+}
+
+.uib-import-warning > span {
+  flex: none;
+}
+
+.uib-import-warning ul {
+  margin: 0;
+  padding-left: 16px;
+  flex: 1;
+}
+

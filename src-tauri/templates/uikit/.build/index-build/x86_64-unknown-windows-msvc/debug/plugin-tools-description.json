@@ -1,0 +1,254 @@
+{
+  "builtTestProducts" : [
+
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.{{projectName}}-x86_64-unknown-windows-msvc-debug.module" : {
+      "executable" : "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Toolchains\\6.4.0+Asserts\\usr\\bin\\swiftc.exe",
+      "fileList" : "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\sources",
+      "importPath" : "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "D:\\crosscode\\src-tauri\\templates\\uikit\\Sources\\AppDelegate.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "D:\\crosscode\\src-tauri\\templates\\uikit\\Sources\\RootViewController.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\swift-version--319CA7822A0FBD8C.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\sources"
+        }
+      ],
+      "isLibrary" : false,
+      "moduleName" : "__projectName__",
+      "moduleOutputPath" : "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\Modules\\__projectName__.swiftmodule",
+      "objects" : [
+        "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\AppDelegate.swift.o",
+        "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\RootViewController.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "x86_64-unknown-windows-msvc",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-Onone",
+        "-enable-testing",
+        "-j8",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\ModuleCache",
+        "-parseable-output",
+        "-Xfrontend",
+        "-entry-point-function-name",
+        "-Xfrontend",
+        "__projectName___main",
+        "-static",
+        "-swift-version",
+        "6",
+        "-Xfrontend",
+        "-experimental-lazy-typecheck",
+        "-Xfrontend",
+        "-experimental-skip-all-function-bodies",
+        "-Xfrontend",
+        "-experimental-allow-module-with-compiler-errors",
+        "-Xfrontend",
+        "-empty-abi-descriptor",
+        "-sdk",
+        "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\SDKs\\Windows.sdk",
+        "-libc",
+        "MD",
+        "-I",
+        "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\XCTest-6.4.0\\usr\\lib\\swift\\windows",
+        "-I",
+        "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\XCTest-6.4.0\\usr\\lib\\swift\\windows\\x86_64",
+        "-L",
+        "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\XCTest-6.4.0\\usr\\lib\\swift\\windows\\x86_64",
+        "-I",
+        "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\Testing-6.4.0\\usr\\lib\\swift\\windows",
+        "-L",
+        "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\Testing-6.4.0\\usr\\lib\\swift\\windows\\x86_64",
+        "-use-ld=lld",
+        "-g",
+        "-use-ld=lld",
+        "-Xcc",
+        "-D_MT",
+        "-Xcc",
+        "-D_DLL",
+        "-Xcc",
+        "-Xclang",
+        "-Xcc",
+        "--dependent-lib=msvcrt",
+        "-Xcc",
+        "-gdwarf",
+        "-package-name",
+        "uikit"
+      ],
+      "outputFileMapPath" : "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\Modules\\__projectName__.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : true,
+      "sources" : [
+        "D:\\crosscode\\src-tauri\\templates\\uikit\\Sources\\AppDelegate.swift",
+        "D:\\crosscode\\src-tauri\\templates\\uikit\\Sources\\RootViewController.swift"
+      ],
+      "tempsPath" : "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "__projectName__" : [
+      "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Toolchains\\6.4.0+Asserts\\usr\\bin\\swiftc.exe",
+      "-module-name",
+      "__projectName__",
+      "-package-name",
+      "uikit",
+      "-c",
+      "D:\\crosscode\\src-tauri\\templates\\uikit\\Sources\\AppDelegate.swift",
+      "D:\\crosscode\\src-tauri\\templates\\uikit\\Sources\\RootViewController.swift",
+      "-I",
+      "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\Modules",
+      "-target",
+      "x86_64-unknown-windows-msvc",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-Onone",
+      "-enable-testing",
+      "-j8",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\ModuleCache",
+      "-parseable-output",
+      "-Xfrontend",
+      "-entry-point-function-name",
+      "-Xfrontend",
+      "__projectName___main",
+      "-static",
+      "-swift-version",
+      "6",
+      "-Xfrontend",
+      "-experimental-lazy-typecheck",
+      "-Xfrontend",
+      "-experimental-skip-all-function-bodies",
+      "-Xfrontend",
+      "-experimental-allow-module-with-compiler-errors",
+      "-Xfrontend",
+      "-empty-abi-descriptor",
+      "-sdk",
+      "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\SDKs\\Windows.sdk",
+      "-libc",
+      "MD",
+      "-I",
+      "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\XCTest-6.4.0\\usr\\lib\\swift\\windows",
+      "-I",
+      "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\XCTest-6.4.0\\usr\\lib\\swift\\windows\\x86_64",
+      "-L",
+      "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\XCTest-6.4.0\\usr\\lib\\swift\\windows\\x86_64",
+      "-I",
+      "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\Testing-6.4.0\\usr\\lib\\swift\\windows",
+      "-L",
+      "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Platforms\\6.4.0\\Windows.platform\\Developer\\Library\\Testing-6.4.0\\usr\\lib\\swift\\windows\\x86_64",
+      "-use-ld=lld",
+      "-g",
+      "-use-ld=lld",
+      "-Xcc",
+      "-D_MT",
+      "-Xcc",
+      "-D_DLL",
+      "-Xcc",
+      "-Xclang",
+      "-Xcc",
+      "--dependent-lib=msvcrt",
+      "-Xcc",
+      "-gdwarf",
+      "-package-name",
+      "uikit",
+      "-driver-use-frontend-path",
+      "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Toolchains\\6.4.0+Asserts\\usr\\bin\\swiftc.exe"
+    ]
+  },
+  "targetDependencyMap" : {
+    "__projectName__" : [
+
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  },
+  "traitConfiguration" : {
+    "default" : [
+      {
+
+      }
+    ]
+  },
+  "writeCommands" : {
+    "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "D:\\crosscode\\src-tauri\\templates\\uikit\\Sources\\AppDelegate.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "D:\\crosscode\\src-tauri\\templates\\uikit\\Sources\\RootViewController.swift"
+        }
+      ],
+      "outputFilePath" : "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\__projectName__.build\\sources"
+    },
+    "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\swift-version--319CA7822A0FBD8C.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "D:\\Users\\dilli\\AppData\\Local\\Programs\\Swift\\Toolchains\\6.4.0+Asserts\\usr\\bin\\swiftc.exe"
+        }
+      ],
+      "outputFilePath" : "D:\\crosscode\\src-tauri\\templates\\uikit\\.build\\index-build\\x86_64-unknown-windows-msvc\\debug\\swift-version--319CA7822A0FBD8C.txt"
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, DragEvent } from "react";
-import { exists, mkdir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { exists, mkdir, readDir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { Button, Checkbox, Select, Option, Typography } from "@mui/joy";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
@@ -18,6 +18,8 @@ import {
 import type { PropField } from "./catalog";
 import { generateSwift } from "./codegen";
 import { str, swiftIdentifier } from "./format";
+import { parseSwiftDocument } from "./parse";
+import type { SwiftImport } from "./parse";
 import {
   DEFAULT_VIEW_NAME,
   DOCUMENT_VERSION,
@@ -119,6 +121,33 @@ function normalizeDocument(raw: unknown): UIDocument | null {
     includePreview: record.includePreview !== false,
     root,
   };
+}
+
+/** Compares two layouts, ignoring node ids (which are regenerated on load). */
+function sameLayout(a: UINode, b: UINode): boolean {
+  if (a.kind !== b.kind) return false;
+  const aKeys = Object.keys(a.props).sort();
+  const bKeys = Object.keys(b.props).sort();
+  if (aKeys.length !== bKeys.length) return false;
+  if (aKeys.some((key, index) => key !== bKeys[index] || a.props[key] !== b.props[key])) {
+    return false;
+  }
+  if (a.children.length !== b.children.length) return false;
+  return a.children.every((child, index) => sameLayout(child, b.children[index]));
+}
+
+/**
+ * Reads a Swift file and parses it, or null when it holds no SwiftUI view.
+ */
+async function readSwiftView(path: string): Promise<SwiftImport | null> {
+  try {
+    const source = await readTextFile(path);
+    const name = path.slice(path.lastIndexOf("/") + 1).replace(/\.swift$/i, "");
+    return parseSwiftDocument(source, { name });
+  } catch (error) {
+    console.warn("Failed to read Swift file", path, error);
+    return null;
+  }
 }
 
 /**
@@ -496,6 +525,7 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [showCode, setShowCode] = useState(true);
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const [undoDepth, setUndoDepth] = useState(0);
   const [redoDepth, setRedoDepth] = useState(0);
   const { addToast } = useToast();
@@ -503,6 +533,10 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
   const docRef = useRef(doc);
   const historyRef = useRef<UIDocument[]>([]);
   const futureRef = useRef<UIDocument[]>([]);
+
+  // The load effect must not re-run when these change, so they live in refs.
+  const focusedFileRef = useRef(focusedFile);
+  const targetRef = useRef({ sourcesDirectory: "", viewName: DEFAULT_VIEW_NAME });
 
   const activePackage = useMemo(
     () => packages.find((candidate) => candidate.path === packagePath) ?? null,
@@ -526,6 +560,15 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
   const viewName = swiftIdentifier(doc.name) || DEFAULT_VIEW_NAME;
   const swiftPath = `${sourcesDirectory}/${viewName}.swift`;
   const code = useMemo(() => generateSwift(doc), [doc]);
+
+  // Latest editor/target context, read by the (rarely running) load effect.
+  useEffect(() => {
+    focusedFileRef.current = focusedFile;
+  }, [focusedFile]);
+
+  useEffect(() => {
+    targetRef.current = { sourcesDirectory, viewName };
+  }, [sourcesDirectory, viewName]);
 
   const commit = useCallback((updater: (current: UIDocument) => UIDocument) => {
     const previous = docRef.current;
@@ -628,24 +671,72 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
   useEffect(() => {
     let cancelled = false;
     setLoaded(false);
+    setImportWarnings([]);
+
+    // Without a saved document the builder adopts the Swift file that is
+    // already in the project, so opening it on an existing view shows that view
+    // instead of the starter layout.
+    const findExistingSwiftView = async (): Promise<{ path: string; imported: SwiftImport } | null> => {
+      const { sourcesDirectory, viewName } = targetRef.current;
+      const root = normalizePath(packagePath);
+      const candidates: string[] = [];
+      const focused = focusedFileRef.current ? normalizePath(focusedFileRef.current) : "";
+      if (focused.toLowerCase().endsWith(".swift") && focused.startsWith(`${root}/`)) {
+        candidates.push(focused);
+      }
+      candidates.push(`${sourcesDirectory}/${viewName}.swift`);
+      candidates.push(`${sourcesDirectory}/${DEFAULT_VIEW_NAME}.swift`);
+      try {
+        for (const entry of await readDir(sourcesDirectory)) {
+          if (entry.isFile && entry.name.toLowerCase().endsWith(".swift")) {
+            candidates.push(`${sourcesDirectory}/${entry.name}`);
+          }
+        }
+      } catch {
+        // the target folder may not exist yet
+      }
+      for (const path of [...new Set(candidates)]) {
+        const imported = await readSwiftView(path);
+        if (imported) return { path, imported };
+      }
+      return null;
+    };
+
     (async () => {
       try {
+        const starter = starterDocument();
+
+        let saved: UIDocument | null = null;
         if (await exists(documentPath)) {
-          const parsed = normalizeDocument(JSON.parse(await readTextFile(documentPath)));
-          if (parsed && !cancelled) {
-            historyRef.current = [];
-            futureRef.current = [];
-            docRef.current = parsed;
-            setDoc(parsed);
-            setSelectedId(parsed.root.id);
-            setUndoDepth(0);
-            setRedoDepth(0);
-          }
-        } else {
-          const fresh = starterDocument();
-          docRef.current = fresh;
-          setDoc(fresh);
-          setSelectedId(fresh.root.id);
+          saved = normalizeDocument(JSON.parse(await readTextFile(documentPath)));
+        }
+        if (cancelled) return;
+
+        // A saved document that still matches the untouched starter layout means
+        // the builder was only ever opened, never edited. In that case the Swift
+        // file on disk wins, so opening the builder on an existing project shows
+        // the real view instead of "Hello, world!".
+        const untouched =
+          saved !== null && saved.name === starter.name && sameLayout(saved.root, starter.root);
+
+        let next: UIDocument | null = saved && !untouched ? saved : null;
+        let imported: { path: string; imported: SwiftImport } | null = null;
+        if (!next) {
+          imported = await findExistingSwiftView();
+          next = imported ? imported.imported.document : starter;
+        }
+        if (cancelled) return;
+
+        historyRef.current = [];
+        futureRef.current = [];
+        docRef.current = next;
+        setDoc(next);
+        setSelectedId(next.root.id);
+        setUndoDepth(0);
+        setRedoDepth(0);
+        if (imported) {
+          setImportWarnings(imported.imported.warnings);
+          addToast.success(`Imported ${imported.path}`);
         }
       } catch (error) {
         console.warn("Failed to load the UI builder document", error);
@@ -796,6 +887,29 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
     }
   }, [addToast, code, sourcesDirectory, swiftPath]);
 
+  /** Replaces the current layout with the Swift file open in the editor. */
+  const importFromEditor = useCallback(async () => {
+    const focused = focusedFileRef.current ? normalizePath(focusedFileRef.current) : "";
+    if (!focused.toLowerCase().endsWith(".swift")) {
+      addToast.error("Open a SwiftUI view file in the editor first.");
+      return;
+    }
+    const imported = await readSwiftView(focused);
+    if (!imported) {
+      addToast.error(`${focused} declares no SwiftUI view.`);
+      return;
+    }
+    historyRef.current = [];
+    futureRef.current = [];
+    docRef.current = imported.document;
+    setDoc(imported.document);
+    setSelectedId(imported.document.root.id);
+    setUndoDepth(0);
+    setRedoDepth(0);
+    setImportWarnings(imported.warnings);
+    addToast.success(`Imported ${focused}`);
+  }, [addToast]);
+
   const selected = selectedId ? findNode(doc.root, selectedId) : null;
 
   return (
@@ -876,6 +990,14 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
           <Button size="sm" variant="plain" disabled={redoDepth === 0} onClick={redo} title="Redo">
             ↷
           </Button>
+          <Button
+            size="sm"
+            variant="plain"
+            onClick={() => void importFromEditor()}
+            title="Replace the layout with the Swift file open in the editor"
+          >
+            Import Swift
+          </Button>
           <Button size="sm" variant="soft" onClick={() => void saveSwift()}>
             Save {viewName}.swift
           </Button>
@@ -928,6 +1050,23 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
       </div>
 
       {packagesError && <div className="uib-package-error">{packagesError}</div>}
+      {importWarnings.length > 0 && (
+        <div className="uib-import-warning">
+          <span>
+            Imported from Swift — {importWarnings.length} thing
+            {importWarnings.length === 1 ? "" : "s"} could not be represented:
+          </span>
+          <ul>
+            {importWarnings.slice(0, 6).map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+            {importWarnings.length > 6 && <li>…</li>}
+          </ul>
+          <Button size="sm" variant="plain" onClick={() => setImportWarnings([])}>
+            Dismiss
+          </Button>
+        </div>
+      )}
 
       <div className="uib-body">
         <div className="uib-column">
