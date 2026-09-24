@@ -340,3 +340,36 @@
   line-height: 1.45;
   white-space: pre;
 }
+
+/* ------------------------------------------------------ package picker -- */
+
+.uib-package-picker {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--padding-xs);
+  flex-wrap: wrap;
+}
+
+.uib-package-picker > label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.uib-package-picker > label > div {
+  min-width: 130px;
+  max-width: 220px;
+}
+
+.uib-package-error {
+  margin-top: var(--padding-xs);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--joy-palette-danger-700);
+  background: var(--joy-palette-danger-50);
+}

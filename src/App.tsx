@@ -11,6 +11,7 @@ import { IDEProvider } from "./utilities/IDEContext";
 import { CommandProvider } from "./utilities/Command";
 import { ToastProvider } from "react-toast-plus";
 import New from "./pages/New";
+import ImportXcode from "./pages/ImportXcode";
 import NewTemplate from "./pages/NewTemplate";
 import "vscode/localExtensionHost";
 import { UpdateProvider } from "./utilities/UpdateContext";
@@ -85,6 +86,7 @@ const App = () => {
               <Route index element={<Onboarding />} />
               <Route path="/ide/:path" element={<IDE />} />
               <Route path="/new" element={<New />} />
+              <Route path="/import" element={<ImportXcode />} />
               <Route path="/new/:template" element={<NewTemplate />} />
               <Route path="*" element={<Navigate to="/" replace />} />
 

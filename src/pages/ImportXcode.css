@@ -1,0 +1,77 @@
+.import-page {
+  padding-bottom: var(--padding-xl);
+}
+
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--padding-md);
+  margin-top: var(--padding-md);
+  flex-wrap: wrap;
+}
+
+.import-projects {
+  display: flex;
+  gap: var(--padding-sm);
+  flex-wrap: wrap;
+  margin-top: var(--padding-sm);
+}
+
+.import-plan {
+  margin-top: var(--padding-lg);
+  max-width: 60rem;
+}
+
+.import-list {
+  margin: 0 0 var(--padding-sm) 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.import-list > li > code,
+.import-plan code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.import-muted {
+  opacity: 0.6;
+}
+
+.import-warnings {
+  color: var(--joy-palette-warning-700);
+}
+
+.import-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--padding-sm);
+  margin-bottom: var(--padding-sm);
+}
+
+.import-options > label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+
+.import-options input[type="text"] {
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--joy-palette-divider);
+  border-radius: 6px;
+  max-width: 40rem;
+}
+
+.import-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}

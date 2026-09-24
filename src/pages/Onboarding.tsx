@@ -121,6 +121,19 @@ export default ({}: OnboardingProps) => {
         <Button size="lg" disabled={!ready} onClick={openFolderDialog}>
           Open Project
         </Button>
+        <Button
+          size="lg"
+          variant="outlined"
+          disabled={!ready}
+          className={!ready ? "disabled-button" : ""}
+          onClick={() => {
+            if (ready) {
+              navigate("/import");
+            }
+          }}
+        >
+          Import Xcode Project
+        </Button>
       </div>
 
       <Typography

@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, DragEvent } from "react";
 import { exists, mkdir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { Button, Checkbox, Typography } from "@mui/joy";
+import { Button, Checkbox, Select, Option, Typography } from "@mui/joy";
+import { invoke } from "@tauri-apps/api/core";
+import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import { useToast } from "react-toast-plus";
 import {
   CATALOG,
@@ -32,13 +34,32 @@ import {
   walk,
 } from "./types";
 import type { Props, UIDocument, UINode } from "./types";
+import { joinPath, normalizePath } from "../xcode-import/project-files";
+import { useIDE } from "../utilities/IDEContext";
 import "./UIBuilder.css";
+
+/** One SwiftPM package of the workspace, as reported by the backend. */
+export type PackageTarget = {
+  name: string;
+  kind: string;
+  path: string;
+  isTest: boolean;
+};
+
+export type SwiftPackage = {
+  name: string;
+  path: string;
+  targets: PackageTarget[];
+  error: string | null;
+};
 
 const PALETTE_MIME = "application/x-crosscode-ui-kind";
 const NODE_MIME = "application/x-crosscode-ui-node";
 
 export interface UIBuilderProps {
   projectPath: string;
+  /** The file the editor currently shows; the builder follows its package. */
+  focusedFile?: string | null;
   openNewFile: (file: string) => void;
   onClose: () => void;
 }
@@ -464,8 +485,14 @@ const Inspector = ({
 
 // ------------------------------------------------------------------- main --
 
-export default ({ projectPath, openNewFile, onClose }: UIBuilderProps) => {
+export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderProps) => {
+  const { selectedToolchain } = useIDE();
   const [doc, setDoc] = useState<UIDocument>(starterDocument);
+  const [packages, setPackages] = useState<SwiftPackage[]>([]);
+  const [packagesError, setPackagesError] = useState<string | null>(null);
+  const [loadingPackages, setLoadingPackages] = useState(true);
+  const [packagePath, setPackagePath] = useState<string>(normalizePath(projectPath));
+  const [targetPath, setTargetPath] = useState<string>("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [showCode, setShowCode] = useState(true);
@@ -477,14 +504,25 @@ export default ({ projectPath, openNewFile, onClose }: UIBuilderProps) => {
   const historyRef = useRef<UIDocument[]>([]);
   const futureRef = useRef<UIDocument[]>([]);
 
+  const activePackage = useMemo(
+    () => packages.find((candidate) => candidate.path === packagePath) ?? null,
+    [packagePath, packages]
+  );
+  const targets = useMemo(
+    () => (activePackage ? activePackage.targets.filter((target) => !target.isTest) : []),
+    [activePackage]
+  );
+
+  // Per package, so switching packages switches the document too.
   const documentPath = useMemo(
-    () => `${projectPath.replace(/[\\/]+$/, "")}/.crosscode/ui-builder.json`,
-    [projectPath]
+    () => `${normalizePath(packagePath)}/.crosscode/ui-builder.json`,
+    [packagePath]
   );
-  const sourcesDirectory = useMemo(
-    () => `${projectPath.replace(/[\\/]+$/, "")}/Sources`,
-    [projectPath]
-  );
+  const sourcesDirectory = useMemo(() => {
+    const base = normalizePath(packagePath);
+    const relative = targetPath.length > 0 ? targetPath.replace(/^\/+/, "") : "Sources";
+    return `${base}/${relative}`;
+  }, [packagePath, targetPath]);
   const viewName = swiftIdentifier(doc.name) || DEFAULT_VIEW_NAME;
   const swiftPath = `${sourcesDirectory}/${viewName}.swift`;
   const code = useMemo(() => generateSwift(doc), [doc]);
@@ -522,7 +560,71 @@ export default ({ projectPath, openNewFile, onClose }: UIBuilderProps) => {
     setRedoDepth(futureRef.current.length);
   }, []);
 
-  // load the document that belongs to this project
+  const loadPackages = useCallback(
+    async (root: string, keepSelection: boolean) => {
+      setLoadingPackages(true);
+      try {
+        const found = await invoke<SwiftPackage[]>("list_swift_packages", {
+          rootPath: root,
+          toolchainPath: selectedToolchain?.path ?? "",
+        });
+        setPackages(found);
+        setPackagesError(null);
+        if (found.length === 0) {
+          setPackagesError("No Swift package found below this project.");
+          return;
+        }
+        setPackagePath((current) => {
+          if (keepSelection && found.some((candidate) => candidate.path === current)) return current;
+          const normalized = normalizePath(root);
+          return (
+            found.find((candidate) => candidate.path === normalized)?.path ?? found[0].path
+          );
+        });
+      } catch (error) {
+        setPackages([]);
+        setPackagesError(String(error));
+      } finally {
+        setLoadingPackages(false);
+      }
+    },
+    [selectedToolchain]
+  );
+
+  useEffect(() => {
+    void loadPackages(projectPath, true);
+  }, [loadPackages, projectPath]);
+
+  // the builder follows the package of the file that is open in the editor
+  useEffect(() => {
+    if (!focusedFile || packages.length === 0) return;
+    const file = normalizePath(focusedFile);
+    const owner = packages
+      .filter((candidate) => file.startsWith(`${candidate.path}/`))
+      .sort((a, b) => b.path.length - a.path.length)[0];
+    if (!owner || owner.path === packagePath) return;
+    setPackagePath(owner.path);
+  }, [focusedFile, packages, packagePath]);
+
+  // keep the target valid for the selected package
+  useEffect(() => {
+    if (!activePackage) return;
+    const current = targets.find((target) => target.path === targetPath);
+    if (current) return;
+    if (focusedFile) {
+      const file = normalizePath(focusedFile);
+      const owner = targets.find(
+        (target) => target.path.length > 0 && file.startsWith(joinPath(activePackage.path, target.path) + "/")
+      );
+      if (owner) {
+        setTargetPath(owner.path);
+        return;
+      }
+    }
+    setTargetPath(targets[0]?.path ?? "Sources");
+  }, [activePackage, focusedFile, targetPath, targets]);
+
+  // load the document that belongs to the selected package
   useEffect(() => {
     let cancelled = false;
     setLoaded(false);
@@ -555,7 +657,7 @@ export default ({ projectPath, openNewFile, onClose }: UIBuilderProps) => {
     return () => {
       cancelled = true;
     };
-  }, [documentPath, addToast]);
+  }, [documentPath, addToast, packagePath]);
 
   // autosave (debounced) so the layout survives a window reload
   useEffect(() => {
@@ -700,6 +802,73 @@ export default ({ projectPath, openNewFile, onClose }: UIBuilderProps) => {
     <div className="uib-root">
       <div className="uib-header">
         <Typography level="title-sm">UI Builder</Typography>
+        <div className="uib-package-picker">
+          <label>
+            Package
+            <Select
+              size="sm"
+              value={activePackage?.path ?? ""}
+              onChange={(_event, value) => {
+                if (typeof value === "string" && value.length > 0) setPackagePath(value);
+              }}
+              disabled={loadingPackages || packages.length === 0}
+            >
+              {(packages.length > 0 ? packages : [{ name: normalizePath(projectPath), path: "", targets: [], error: null }]).map(
+                (candidate) => (
+                  <Option key={candidate.path} value={candidate.path}>
+                    {candidate.name}
+                  </Option>
+                )
+              )}
+            </Select>
+          </label>
+          <label>
+            Target
+            <Select
+              size="sm"
+              value={targetPath}
+              onChange={(_event, value) => {
+                if (typeof value === "string") setTargetPath(value);
+              }}
+              disabled={targets.length === 0}
+            >
+              {(targets.length > 0
+                ? targets.map((target) => target.path)
+                : ["Sources"]
+              ).map((path) => (
+                <Option key={path} value={path}>
+                  {targets.find((target) => target.path === path)?.name ?? path}
+                </Option>
+              ))}
+            </Select>
+          </label>
+          <Button
+            size="sm"
+            variant="plain"
+            title="Choose another package folder"
+            onClick={async () => {
+              const picked = await openFolderDialog({
+                directory: true,
+                multiple: false,
+                title: "Select a Swift package folder",
+              });
+              if (!picked || Array.isArray(picked)) return;
+              const root = normalizePath(picked);
+              setPackagePath(root);
+              await loadPackages(root, false);
+            }}
+          >
+            Choose…
+          </Button>
+          <Button
+            size="sm"
+            variant="plain"
+            title="Search for packages again"
+            onClick={() => void loadPackages(packagePath, true)}
+          >
+            ↻
+          </Button>
+        </div>
         <div className="uib-header-actions">
           <Button size="sm" variant="plain" disabled={undoDepth === 0} onClick={undo} title="Undo">
             ↶
@@ -757,6 +926,8 @@ export default ({ projectPath, openNewFile, onClose }: UIBuilderProps) => {
           </Button>
         </div>
       </div>
+
+      {packagesError && <div className="uib-package-error">{packagesError}</div>}
 
       <div className="uib-body">
         <div className="uib-column">

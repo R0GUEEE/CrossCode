@@ -45,6 +45,10 @@ export default [
             name: "Open Folder...",
             callbackName: "openFolderDialog",
           },
+          {
+            name: "Import Xcode Project...",
+            callbackName: "importXcodeProject",
+          },
         ],
       },
       {

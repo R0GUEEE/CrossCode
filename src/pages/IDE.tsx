@@ -204,6 +204,7 @@ export default () => {
       undo: undo ?? (() => {}),
       redo: redo ?? (() => {}),
       toggleUIBuilder: () => setUIBuilderOpen((open) => !open),
+      importXcodeProject: () => navigate("/import"),
     });
   }, [
     saveFile,
@@ -257,6 +258,7 @@ export default () => {
           <div className="ui-builder-tile">
             <UIBuilder
               projectPath={path}
+              focusedFile={openFile}
               openNewFile={openNewFile}
               onClose={() => setUIBuilderOpen(false)}
             />
