@@ -45,6 +45,10 @@ export const installSdkOperation: Operation = {
       title: "Download & Install toolset",
     },
     {
+      id: "install_macros",
+      title: "Download & Install macros",
+    },
+    {
       id: "extract_xip",
       title: "Extract Xcode.xip",
     },

@@ -14,7 +14,7 @@
 
 iOS Swift development IDE for Windows/Linux. Create, build, and test apps without owning a Mac.
 
-Supports Swift 6.3 (and Swift 6.4, incl. Xcode 27.0 betas) and the Swift Package Manager.
+Supports Swift 6.4 (and the in-development Swift 6.5 snapshots), the iOS SDK shipped with Xcode 27.0, and the Swift Package Manager.
 
 ### Demo
 
@@ -30,8 +30,10 @@ Check out the [Getting Started](https://github.com/nab138/CrossCode/wiki#getting
 
 ## Features
 
-- Generate a Darwin SDK for linux from a user provided copy of the latest Xcode (e.g. Xcode 26.6) to build the apps
+- Generate a Darwin SDK for linux from a user provided copy of the latest Xcode (e.g. Xcode 27.0) to build the apps
 - Build apps using swift package manager
+- Visual SwiftUI builder: assemble views on a canvas, edit their properties, and generate the SwiftUI source
+- Import an existing Xcode project into a buildable CrossCode package
 - Log in with your Apple ID to sign apps
 - Install apps on device
 - Create projects from templates
@@ -49,9 +51,68 @@ Please note that I am one person, so development may be slow. If you want to hel
 
 ## How it works
 
-- A darwin SDK is generated from a user provided copy of the latest Xcode (e.g. Xcode 26.6; extracted with [unxip-rs](https://github.com/nab138/unxip-rs)) and darwin tools from [darwin-tools-linux-llvm](https://github.com/xtool-org/darwin-tools-linux-llvm)
+- A darwin SDK is generated from a user provided copy of the latest Xcode (e.g. Xcode 27.0; extracted with [unxip-rs](https://github.com/nab138/unxip-rs)), the darwin tools from [darwin-tools-linux-llvm](https://github.com/xtool-org/darwin-tools-linux-llvm) (currently v1.1.0), and the macro server from [OpenAppleMacros](https://github.com/xtool-org/OpenAppleMacros) (currently v1.3.0), which is what makes Apple's SwiftUI/Previews/FoundationModels macros usable on Linux.
 - Swift uses the darwin SDK to build an executable which is packaged into an .app bundle.
 - The code to sign and install apps onto a device has been removed from CrossCode's source and moved to a standalone package, [isideload](https://github.com/nab138/isideload). It was built on a lot of other libraries, so check out its README for more info.
+
+## UI Builder
+
+`View -> Panels -> UI Builder` opens a visual editor for SwiftUI views next to
+the code editor:
+
+- the **Package** and **Target** pickers at the top choose what the builder
+  writes into; it follows the file that is open in the editor and can also be
+  pointed at any other Swift package folder on disk (each package keeps its own
+  layout file),
+
+- drag components from the palette onto the canvas (or click to append them),
+- select a view to edit its properties, bindings and modifiers in the inspector,
+- reorder, duplicate or delete views in the structure tree, and
+- watch the generated SwiftUI code update live.
+
+`Save <View>.swift` writes the result to `<project>/Sources/<View>.swift`, which
+`Open in Editor` then opens in Monaco. The layout itself is stored in the
+project as `.crosscode/ui-builder.json` (the same folder that keeps your open
+tabs), so it survives restarts. Controls that need state (Toggle, TextField,
+Slider, ...) declare their `@State` variables automatically.
+
+The canvas is a preview approximation, not a simulator; build the app to see
+the real thing on a device.
+
+## Importing an Xcode project
+
+`Import Xcode Project` on the welcome page (or *File -> Open -> Import Xcode
+Project...*) converts an existing `.xcodeproj` into a package CrossCode can
+build and install:
+
+1. pick the folder containing the project,
+2. review the plan: the app target, the files that will be created, the package
+   dependencies that were found and every warning,
+3. import — CrossCode writes `Package.swift`, `crosscode.toml` and an
+   Info.plist, and copies plain resources into `Resources/`.
+
+The sources stay where they are: the generated manifest points at them with
+`path:` and `exclude:`, so Xcode and CrossCode keep working on the same files.
+
+What the importer does and does not do:
+
+- framework targets become libraries and app targets become the executable
+  product (`swift-tools-version: 6.4`, `platforms: [.iOS("<deployment
+  target>")]`),
+- local Swift packages (including the folder references Xcode creates when you
+  add a package without a `PackageReference`) and remote package URLs are
+  carried over into `Package.swift`,
+- the Info.plist is converted: the fields CrossCode manages become `[[bundle_id]]`,
+  `[[product]]`, `[[version_num]]` and `[[version_string]]`, and every other
+  `$(SETTING)` is expanded from the project's build settings,
+- only one app target is imported (SwiftPM cannot have two targets compiling the
+  same files), test targets and app extensions are skipped, and a file compiled
+  by several targets is assigned to the app,
+- **asset catalogs, storyboards and Metal sources cannot be compiled on Linux**
+  (they need `actool`, `ibtool` or the Metal toolchain from Xcode), so apps that
+  depend on them will build without those assets,
+- shared files, alternate app targets and remote package requirements are
+  reported as warnings rather than silently dropped.
 
 ## Credits
 

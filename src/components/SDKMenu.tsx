@@ -8,7 +8,9 @@ import { installSdkOperation } from "../utilities/operations";
 import ErrorIcon from "@mui/icons-material/Error";
 import WarningIcon from "@mui/icons-material/Warning";
 import {
+  XCODE_DOWNLOAD_URL,
   XCODE_VERSION,
+  MIN_DARWIN_SDK_VERSION,
   isSupportedSDKVersion,
 } from "../utilities/constants";
 
@@ -127,7 +129,7 @@ export default () => {
           >
             {isSupportedSDKVersion(darwinSDKVersion)
               ? `Version: ${darwinSDKVersion}`
-              : `Unsupported SDK version (${darwinSDKVersion}). It is older than the minimum supported version (26.5). Please re-install with Xcode ${XCODE_VERSION} or later.`}
+              : `Unsupported SDK version (${darwinSDKVersion}). It is older than the minimum supported version (${MIN_DARWIN_SDK_VERSION}). Please re-install with Xcode ${XCODE_VERSION} or later.`}
           </Typography>
         )}
       </div>
@@ -141,9 +143,7 @@ export default () => {
           variant="soft"
           onClick={(e) => {
             e.preventDefault();
-            openUrl(
-              "https://developer.apple.com/services-account/download?path=/Developer_Tools/Xcode_26/Xcode_26.6_Universal.xip"
-            );
+            openUrl(XCODE_DOWNLOAD_URL);
           }}
         >
           Download XCode {XCODE_VERSION}

@@ -45,6 +45,10 @@ export default [
             name: "Open Folder...",
             callbackName: "openFolderDialog",
           },
+          {
+            name: "Import Xcode Project...",
+            callbackName: "importXcodeProject",
+          },
         ],
       },
       {
@@ -172,6 +176,15 @@ export default [
           {
             name: "Show Welcome Page",
             callbackName: "welcomePage",
+          },
+        ],
+      },
+      {
+        label: "Panels",
+        items: [
+          {
+            name: "UI Builder",
+            callbackName: "toggleUIBuilder",
           },
         ],
       },

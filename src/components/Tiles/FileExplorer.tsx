@@ -150,13 +150,15 @@ const FileItem: React.FC<FileItemProps> = ({
 export interface FileExplorerProps {
   openFolder: string;
   setOpenFile: (file: string) => void;
+  openInUIBuilder: (file: string) => void;
 }
-export default ({ openFolder, setOpenFile }: FileExplorerProps) => {
+export default ({ openFolder, setOpenFile, openInUIBuilder }: FileExplorerProps) => {
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
     mouseY: number;
     filePath: string;
     isFolder: boolean;
+    canOpenInUIBuilder: boolean;
   } | null>(null);
 
   const { addToast } = useToast();
@@ -177,20 +179,26 @@ export default ({ openFolder, setOpenFile }: FileExplorerProps) => {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleteBasename, setDeleteBasename] = useState("");
 
-  const handleContextMenu = (event: React.MouseEvent) => {
-    if (event.target instanceof HTMLButtonElement) {
-      const path = event.target.getAttribute("data-path");
-      if (path) {
+  const handleContextMenu = async (event: React.MouseEvent) => {
+    const button = (event.target as Element).closest("button");
+    if (button) {
+      const selectedPath = button.getAttribute("data-path");
+      if (selectedPath) {
         event.preventDefault();
+
+        const isFolder = button.getAttribute("data-is-folder") === "true";
+        const canOpenInUIBuilder = isFolder
+          ? await fs.exists(await path.resolve(selectedPath, "Package.swift"))
+          : selectedPath.toLowerCase().endsWith(".swift");
 
         setContextMenu(
           contextMenu === null
             ? {
                 mouseX: event.clientX + 2,
                 mouseY: event.clientY - 6,
-                filePath: path,
-                isFolder:
-                  event.target.getAttribute("data-is-folder") === "true",
+                filePath: selectedPath,
+                isFolder,
+                canOpenInUIBuilder,
               }
             : null
         );
@@ -309,6 +317,18 @@ export default ({ openFolder, setOpenFile }: FileExplorerProps) => {
             </MenuItem>
           )}
           {contextMenu?.isFolder && <Divider />}
+          {contextMenu?.canOpenInUIBuilder && (
+            <MenuItem
+              onClick={() => {
+                const selectedPath = contextMenu.filePath;
+                handleClose();
+                openInUIBuilder(selectedPath);
+              }}
+            >
+              Open in UI Builder
+            </MenuItem>
+          )}
+          {contextMenu?.canOpenInUIBuilder && <Divider />}
           <MenuItem
             onClick={async () => {
               handleClose();

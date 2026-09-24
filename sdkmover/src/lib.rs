@@ -82,17 +82,25 @@ fn wanted_sdk_entry() -> SDKEntry {
                     .iter()
                     .map(|plat| {
                         SDKEntry::e(
-                            Some(&format!("{}.platform/Developer", plat)),
+                            Some(&format!("{}.platform", plat)),
                             vec![
-                                SDKEntry::e(Some("SDKs"), vec![]),
+                                // The platform manifest carries the platform's
+                                // default build properties; xtool keeps it too.
+                                SDKEntry::e(Some("Info.plist"), vec![]),
                                 SDKEntry::e(
-                                    Some("Library"),
+                                    Some("Developer"),
                                     vec![
-                                        SDKEntry::e(Some("Frameworks"), vec![]),
-                                        SDKEntry::e(Some("PrivateFrameworks"), vec![]),
+                                        SDKEntry::e(Some("SDKs"), vec![]),
+                                        SDKEntry::e(
+                                            Some("Library"),
+                                            vec![
+                                                SDKEntry::e(Some("Frameworks"), vec![]),
+                                                SDKEntry::e(Some("PrivateFrameworks"), vec![]),
+                                            ],
+                                        ),
+                                        SDKEntry::e(Some("usr/lib"), vec![]),
                                     ],
                                 ),
-                                SDKEntry::e(Some("usr/lib"), vec![]),
                             ],
                         )
                     })

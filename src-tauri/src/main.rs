@@ -14,6 +14,7 @@ mod sideloader;
 mod sourcekit_lsp;
 #[macro_use]
 mod lsp_utils;
+mod xcode;
 
 use builder::crossplatform::{linux_path, windows_path};
 use builder::icon::import_icon;
@@ -36,6 +37,7 @@ use sideloader::{
     syslog::{is_streaming_syslog, start_stream_syslog, stop_stream_syslog, SyslogStream},
 };
 use sourcekit_lsp::{get_server_status, start_sourcekit_server, stop_sourcekit_server};
+use xcode::{apply_xcode_import, list_swift_packages};
 use std::sync::Arc;
 use tauri::Emitter;
 use tauri::Manager;
@@ -155,6 +157,8 @@ fn main() {
             is_ddi_mounted,
             mount_ddi,
             take_screenshot,
+            apply_xcode_import,
+            list_swift_packages,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

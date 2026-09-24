@@ -2,11 +2,13 @@ name: "Build CrossCode"
 
 on:
   push:
+    # "**" (not "*") so pushes to slash-containing branches such as
+    # feature/foo are built too — "*" does not match "/".
     branches:
-      - "*"
+      - "**"
   pull_request:
     branches:
-      - "*"
+      - "**"
   workflow_dispatch:
   release:
     types: [published]
@@ -54,6 +56,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: bun i --frozen-lockfile
+
+      - name: Frontend unit tests (UI builder, Xcode importer)
+        run: bun test src
 
       - name: Clean old bundles
         run: bunx rimraf src-tauri/target/release/bundle
