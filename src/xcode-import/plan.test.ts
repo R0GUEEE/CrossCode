@@ -165,6 +165,17 @@ describe("planImport", () => {
     expect(plan.warnings.some((warning) => warning.includes("default Info.plist"))).toBe(true);
   });
 
+  test("keeps a macOS project's platform and warns", () => {
+    // the setting lives in both the Debug and the Release configuration
+    const macOS = FIXTURE_PBX.split("IPHONEOS_DEPLOYMENT_TARGET = 17.0;").join(
+      "SDKROOT = macosx;\n\t\t\t\tMACOSX_DEPLOYMENT_TARGET = 14.4;"
+    );
+    const plan = planImport(macOS, XCODEPROJ, { packageRoot: "/work", listDirectory: fixtureDirectory });
+    const manifest = plan.files.find((file) => file.path === "Package.swift")!.contents;
+    expect(manifest).toContain('platforms: [.macOS("14.4")]');
+    expect(plan.warnings.some((warning) => warning.includes("targets macOS"))).toBe(true);
+  });
+
   test("rejects projects without an application target", () => {
     const onlyTests = FIXTURE_PBX.replace(
       'productType = "com.apple.product-type.application";',

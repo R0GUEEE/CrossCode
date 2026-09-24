@@ -589,7 +589,7 @@ function withPlistDefaults(settings: Record<string, string>): Record<string, str
 export function generatePackageSwift(
   packageName: string,
   targets: ImportTarget[],
-  platformVersion: string | null,
+  platform: { name: string; version: string } | null,
   packages: ImportPackageDependency[] = []
 ): string {
   const converted = targets.filter((target) => target.swiftPackageTargetType !== null);
@@ -603,9 +603,9 @@ export function generatePackageSwift(
   lines.push("");
   lines.push("let package = Package(");
   lines.push(`    name: ${JSON.stringify(packageName)},`);
-  if (platformVersion) {
+  if (platform) {
     // the string overload accepts any x.y[.z] deployment target
-    lines.push(`    platforms: [.iOS(${JSON.stringify(platformVersion)})],`);
+    lines.push(`    platforms: [.${platform.name}(${JSON.stringify(platform.version)})],`);
   }
   if (appTarget) {
     lines.push("    products: [");
@@ -1108,9 +1108,37 @@ export function planImport(
     }
   }
 
-  const deploymentTarget =
-    app.deploymentTarget || projectSettings.IPHONEOS_DEPLOYMENT_TARGET || "17.0";
-  const platformVersion = /^[0-9]+(\.[0-9]+){1,2}$/.test(deploymentTarget) ? deploymentTarget : "17.0";
+  // CrossCode builds iOS apps: detect what the project targets and say so.
+  const sdkRoot = (app.settings.SDKROOT || "").toLowerCase();
+  const supported = (app.settings.SUPPORTED_PLATFORMS || "").toLowerCase();
+  const isMacOS = sdkRoot.includes("macosx") || supported.includes("macosx");
+  const isIOS =
+    sdkRoot.includes("iphoneos") ||
+    sdkRoot.includes("iphonesimulator") ||
+    supported.includes("iphoneos") ||
+    (!isMacOS && (app.settings.IPHONEOS_DEPLOYMENT_TARGET ?? "").length > 0);
+
+  const deploymentTarget = isMacOS
+    ? app.settings.MACOSX_DEPLOYMENT_TARGET || "14.0"
+    : app.deploymentTarget || projectSettings.IPHONEOS_DEPLOYMENT_TARGET || "17.0";
+  const platformVersion = /^[0-9]+(\.[0-9]+){1,2}$/.test(deploymentTarget)
+    ? deploymentTarget
+    : isMacOS
+      ? "14.0"
+      : "17.0";
+  const platform = {
+    name: isMacOS ? "macOS" : "iOS",
+    version: platformVersion,
+  };
+  if (isMacOS) {
+    warnings.push(
+      "This project targets macOS; CrossCode builds and installs iOS apps, so the imported package is a starting point rather than a buildable app."
+    );
+  } else if (!isIOS) {
+    warnings.push(
+      "The project does not declare an iOS deployment target; iOS 17.0 was assumed."
+    );
+  }
 
   const extensions = targets.filter((target) => target.kind === "extension");
   if (extensions.length > 0) {
@@ -1130,7 +1158,7 @@ export function planImport(
     files: [
       {
         path: "Package.swift",
-        contents: generatePackageSwift(packageName, targets, platformVersion, packages.list),
+        contents: generatePackageSwift(packageName, targets, platform, packages.list),
       },
       {
         path: "crosscode.toml",
