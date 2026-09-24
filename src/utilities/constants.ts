@@ -32,9 +32,20 @@ export const MIN_DARWIN_SDK_VERSION = "27.0";
 // Latest stable Xcode for the Download link + install guidance.
 export const XCODE_VERSION = "27.0";
 
-// Home of every Xcode build: the download link is built from the major version
-// so bumping XCODE_VERSION only requires a new minor/major directory here.
-export const XCODE_DOWNLOAD_URL = `https://developer.apple.com/services-account/download?path=/Developer_Tools/Xcode_${XCODE_VERSION.split(".")[0]}/Xcode_${XCODE_VERSION}.xip`;
+// Download link for the Xcode above. Apple names the .0 releases after the
+// major version only ("Xcode_27/Xcode_27.xip") and everything else after the
+// full version plus a "_Universal" suffix
+// ("Xcode_26.6/Xcode_26.6_Universal.xip"), so derive it the same way.
+const XCODE_MAJOR_VERSION = XCODE_VERSION.split(".")[0];
+const XCODE_IS_MAJOR_RELEASE = XCODE_VERSION.endsWith(".0");
+const XCODE_DIRECTORY = XCODE_IS_MAJOR_RELEASE
+  ? `Xcode_${XCODE_MAJOR_VERSION}`
+  : `Xcode_${XCODE_VERSION}`;
+const XCODE_FILE = XCODE_IS_MAJOR_RELEASE
+  ? XCODE_DIRECTORY
+  : `${XCODE_DIRECTORY}_Universal`;
+
+export const XCODE_DOWNLOAD_URL = `https://developer.apple.com/services-account/download?path=/Developer_Tools/${XCODE_DIRECTORY}/${XCODE_FILE}.xip`;
 
 // True when the installed Darwin SDK is at or above the minimum supported.
 // i.e. an SDK is "supported" unless it is older than MIN_DARWIN_SDK_VERSION.
