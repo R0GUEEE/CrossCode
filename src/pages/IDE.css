@@ -21,6 +21,28 @@
   font-weight: 600;
 }
 
+.project-detection-badge {
+  padding: 1px 5px;
+  border: 1px solid var(--joy-palette-success-outlinedBorder);
+  border-radius: 4px;
+  color: var(--joy-palette-success-500);
+  font-size: 10px;
+}
+
+.project-capabilities {
+  display: flex;
+  gap: 3px;
+  min-width: 0;
+}
+
+.project-capability {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--joy-palette-background-level2);
+  color: var(--joy-palette-text-tertiary);
+  font-size: 10px;
+}
+
 .project-entry-point {
   overflow: hidden;
   text-overflow: ellipsis;

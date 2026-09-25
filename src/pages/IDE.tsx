@@ -61,6 +61,8 @@ type ProjectInfo = {
   targets: string[];
   schemes: string[];
   configurations: string[];
+  buildType: string;
+  detectedFiles: string[];
 };
 
 type WorkspaceTarget = {
@@ -181,7 +183,9 @@ export default () => {
       path === undefined ||
       path === null ||
       selectedToolchain === null ||
-      !initialized
+      !initialized ||
+      projectInfo === null ||
+      projectInfo.kind !== "crosscodePackage"
     )
       return;
     setProjectValidation(null);
@@ -197,7 +201,7 @@ export default () => {
         }
       }
     })();
-  }, [path, selectedToolchain, initialized]);
+  }, [path, selectedToolchain, initialized, projectInfo]);
 
   useEffect(() => {
     if (!path) return;
@@ -325,7 +329,15 @@ export default () => {
       {projectInfo && (
         <div className="project-kind-bar">
           <span className="project-kind-label">Project</span>
-          <span>{formatProjectKind(projectInfo.kind)}</span>
+          <span>{projectInfo.buildType || formatProjectKind(projectInfo.kind)}</span>
+          <span className="project-detection-badge">Auto-detected</span>
+          <span className="project-capabilities">
+            {projectInfo.capabilities
+              .filter((capability) => ["xcodeBuild", "swiftBuild", "test", "archive", "simulator", "remoteBuild"].includes(capability))
+              .map((capability) => (
+                <span key={capability} className="project-capability">{formatProjectKind(capability)}</span>
+              ))}
+          </span>
           {workspaceTargets.length > 0 && (
             <Select
               size="sm"

@@ -49,6 +49,7 @@ pub async fn build_project(
 ) -> Result<(), String> {
     let root = PathBuf::from(&project_path);
     let info = ProjectInfo::detect(root.clone())?;
+    let build_root = PathBuf::from(&info.build_root);
 
     if matches!(info.kind, ProjectKind::XcodeProject | ProjectKind::XcodeWorkspace)
         && remote_mac.as_ref().is_some_and(|profile| profile.enabled)
@@ -93,7 +94,7 @@ pub async fn build_project(
             if configuration.eq_ignore_ascii_case("release") {
                 command.arg("-c").arg("release");
             }
-            command.current_dir(root);
+            command.current_dir(&build_root);
             command
         }
         ProjectKind::XcodeProject => {
@@ -101,7 +102,7 @@ pub async fn build_project(
             let mut command = Command::new("xcodebuild");
             command.arg("-project").arg(&entry);
             append_xcode_selection(&mut command, &target, &scheme, &configuration);
-            command.arg("build").current_dir(root);
+            command.arg("build").current_dir(&build_root);
             command
         }
         ProjectKind::XcodeWorkspace => {
@@ -114,22 +115,37 @@ pub async fn build_project(
         }
         ProjectKind::CocoaPods => {
             let mut command = Command::new("pod");
-            command.args(["install"]).current_dir(root);
+            command.args(["install"]).current_dir(&build_root);
             command
         }
         ProjectKind::Tuist => {
             let mut command = Command::new("tuist");
-            command.args(["generate", "--no-open"]).current_dir(root);
+            command.args(["generate", "--no-open"]).current_dir(&build_root);
+            command
+        }
+        ProjectKind::XcodeGen => {
+            let mut command = Command::new("xcodegen");
+            command.args(["generate"]).current_dir(&build_root);
             command
         }
         ProjectKind::Make => {
             let mut command = Command::new("make");
-            command.current_dir(root);
+            command.current_dir(&build_root);
             command
         }
         ProjectKind::Bazel => {
             let mut command = Command::new("bazel");
-            command.args(["build", "//..."]).current_dir(root);
+            command.args(["build", "//..."]).current_dir(&build_root);
+            command
+        }
+        ProjectKind::CMake => {
+            let mut command = Command::new("cmake");
+            command.args(["--build", "build"]).current_dir(&build_root);
+            command
+        }
+        ProjectKind::Fastlane => {
+            let mut command = Command::new("fastlane");
+            command.args(["build"]).current_dir(&build_root);
             command
         }
         ProjectKind::Unknown => {
@@ -155,6 +171,7 @@ pub async fn test_project(
 ) -> Result<(), String> {
     let root = PathBuf::from(&project_path);
     let info = ProjectInfo::detect(root.clone())?;
+    let build_root = PathBuf::from(&info.build_root);
 
     if matches!(info.kind, ProjectKind::XcodeProject | ProjectKind::XcodeWorkspace)
         && scheme.trim().is_empty()
@@ -202,7 +219,7 @@ pub async fn test_project(
             if configuration.eq_ignore_ascii_case("release") {
                 command.arg("-c").arg("release");
             }
-            command.current_dir(root);
+            command.current_dir(&build_root);
             command
         }
         ProjectKind::XcodeProject | ProjectKind::XcodeWorkspace => {
@@ -215,7 +232,7 @@ pub async fn test_project(
             }
             command.arg(entry);
             append_xcode_selection(&mut command, &target, &scheme, &configuration);
-            command.arg("test").current_dir(root);
+            command.arg("test").current_dir(&build_root);
             command
         }
         ProjectKind::Tuist => {
@@ -224,17 +241,30 @@ pub async fn test_project(
             if !scheme.trim().is_empty() {
                 command.arg(&scheme);
             }
-            command.current_dir(root);
+            command.current_dir(&build_root);
             command
+        }
+        ProjectKind::XcodeGen => {
+            return Err("XcodeGen tests require a generated Xcode project and scheme".to_string())
         }
         ProjectKind::Make => {
             let mut command = Command::new("make");
-            command.arg("test").current_dir(root);
+            command.arg("test").current_dir(&build_root);
             command
         }
         ProjectKind::Bazel => {
             let mut command = Command::new("bazel");
-            command.args(["test", "//..."]).current_dir(root);
+            command.args(["test", "//..."]).current_dir(&build_root);
+            command
+        }
+        ProjectKind::CMake => {
+            let mut command = Command::new("ctest");
+            command.args(["--test-dir", "build"]).current_dir(&build_root);
+            command
+        }
+        ProjectKind::Fastlane => {
+            let mut command = Command::new("fastlane");
+            command.args(["test"]).current_dir(&build_root);
             command
         }
         ProjectKind::CocoaPods => {
