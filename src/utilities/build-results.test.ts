@@ -9,7 +9,7 @@ describe("build result parsing", () => {
       "Sources/App.swift:9:1: warning: immutable value was never used",
     ];
     const problems = parseBuildProblems(lines, "/work/App");
-    expect(problems).toHaveLength(2);
+    expect(problems.length).toBe(2);
     expect(problems[0].file).toBe("/work/App/Sources/App.swift");
     expect(problems[0].severity).toBe("error");
   });
@@ -27,7 +27,7 @@ describe("build result parsing", () => {
       "Test Case '-[AppTests.LoginTests testValidLogin]' passed (0.042 seconds).",
       "✔ Test “Creates a profile” passed after 0.003 seconds.",
     ]);
-    expect(results).toHaveLength(2);
+    expect(results.length).toBe(2);
     expect(results[0].status).toBe("passed");
     expect(results[1].name).toBe("Creates a profile");
   });
