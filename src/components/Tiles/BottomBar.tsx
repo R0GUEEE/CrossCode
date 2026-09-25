@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./BottomBar.css";
 import { Button, Input, Tab, TabList, TabPanel, Tabs } from "@mui/joy";
 import CommandButton from "../CommandButton";
@@ -11,21 +11,29 @@ import Console from "./Console";
 import FilteredConsole, { FilteredConsoleHandle } from "./FilteredConsole";
 import { useParams } from "react-router";
 import { useStore } from "../../utilities/StoreContext";
-
-const staticTabs = [
-  {
-    name: "Build Output",
-    component: <CommandConsole />,
-  },
-  {
-    name: "SourceKit-LSP",
-    component: (
-      <Console key="lsp-message" channel="lsp-message" jsonPrettyPrint />
-    ),
-  },
-];
+import { parseBuildProblems, parseTestResults } from "../../utilities/build-results";
+import { ProblemsPanel, TestsPanel } from "./BuildResults";
+import { defaultRemoteMacProfile, RemoteMacProfile } from "../../utilities/remote-mac";
 
 export default function BottomBar() {
+  const { consoleLines } = useIDE();
+  const { path } = useParams<"path">();
+  const workspaceSelectionKey = `workspace/${encodeURIComponent(path ?? "")}`;
+  const [remoteMac] = useStore<RemoteMacProfile>(`${workspaceSelectionKey}/remote-mac`, defaultRemoteMacProfile);
+  const problems = useMemo(
+    () => parseBuildProblems(consoleLines, path ?? "", remoteMac.projectPath),
+    [consoleLines, path, remoteMac.projectPath]
+  );
+  const testResults = useMemo(() => parseTestResults(consoleLines), [consoleLines]);
+  const staticTabs = useMemo(() => [
+    { name: "Build Output", component: <CommandConsole /> },
+    { name: `Problems (${problems.length})`, component: <ProblemsPanel problems={problems} /> },
+    { name: `Tests (${testResults.length})`, component: <TestsPanel results={testResults} /> },
+    {
+      name: "SourceKit-LSP",
+      component: <Console key="lsp-message" channel="lsp-message" jsonPrettyPrint />,
+    },
+  ], [problems, testResults]);
   const [focused, setFocused] = useState<number>();
   const [refreshSyslog, setRefreshSyslog] = useState<number>(0);
   const [runningSyslog, setRunningSyslog] = useState<boolean>(false);

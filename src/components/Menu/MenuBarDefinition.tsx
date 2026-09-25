@@ -308,6 +308,37 @@ export default [
             },
             componentId: "deployMenuBtn",
           },
+          {
+            name: "Test Selected Workspace",
+            shortcut: "Ctrl+U",
+            component: ({ shortcut }) => {
+              const { path } = useParams<"path">();
+              const { selectedToolchain } = useIDE();
+              const selectionKey = `workspace/${encodeURIComponent(path ?? "")}`;
+              const [target] = useStore<string>(`${selectionKey}/target`, "");
+              const [scheme] = useStore<string>(`${selectionKey}/scheme`, "");
+              const [configuration] = useStore<string>(`${selectionKey}/configuration`, "Debug");
+              const [remoteMac] = useStore<RemoteMacProfile>(`${selectionKey}/remote-mac`, defaultRemoteMacProfile);
+              return (
+                <CommandButton
+                  shortcut={shortcut}
+                  command="test_project"
+                  parameters={{
+                    projectPath: path,
+                    toolchainPath: selectedToolchain?.path ?? "",
+                    target,
+                    scheme,
+                    configuration,
+                    remoteMac,
+                  }}
+                  label="Test Selected Workspace"
+                  useMenuItem
+                  id="testWorkspaceMenuBtn"
+                />
+              );
+            },
+            componentId: "testWorkspaceMenuBtn",
+          },
         ],
       },
       {

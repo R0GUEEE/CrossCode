@@ -143,6 +143,111 @@ pub async fn build_project(
     pipe_command(&mut command, &window, true).await
 }
 
+#[tauri::command]
+pub async fn test_project(
+    window: tauri::Window,
+    project_path: String,
+    toolchain_path: String,
+    target: String,
+    scheme: String,
+    configuration: String,
+    remote_mac: Option<RemoteMacProfile>,
+) -> Result<(), String> {
+    let root = PathBuf::from(&project_path);
+    let info = ProjectInfo::detect(root.clone())?;
+
+    if matches!(info.kind, ProjectKind::XcodeProject | ProjectKind::XcodeWorkspace)
+        && scheme.trim().is_empty()
+    {
+        return Err("Select a shared Xcode scheme before running tests".to_string());
+    }
+
+    if matches!(info.kind, ProjectKind::XcodeProject | ProjectKind::XcodeWorkspace)
+        && remote_mac.as_ref().is_some_and(|profile| profile.enabled)
+    {
+        let profile = remote_mac.as_ref().expect("profile was checked");
+        validate_remote_mac(profile)?;
+        let entry = info.entry_point.ok_or("Xcode project entry point is missing")?;
+        let entry_name = PathBuf::from(entry)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or("Xcode project entry point has an invalid name")?;
+        let project_flag = if matches!(info.kind, ProjectKind::XcodeProject) {
+            "-project"
+        } else {
+            "-workspace"
+        };
+        let mut arguments = vec![project_flag.to_string(), shell_quote(entry_name)];
+        append_xcode_arguments(&mut arguments, &target, &scheme, &configuration);
+        arguments.push("test".to_string());
+        let remote_command = format!(
+            "cd {} && xcodebuild {}",
+            shell_quote(&profile.project_path),
+            arguments.join(" ")
+        );
+        let mut command = ssh_command(profile);
+        command.arg(remote_command);
+        window
+            .emit("build-output", format!("Testing on remote Mac {}@{}...", profile.user, profile.host))
+            .map_err(|error| error.to_string())?;
+        return pipe_command(&mut command, &window, true).await;
+    }
+
+    let mut command = match info.kind {
+        ProjectKind::CrosscodePackage | ProjectKind::SwiftPackage => {
+            let swift = SwiftBin::new(&toolchain_path)?;
+            let mut command = swift.command();
+            command.arg("test");
+            if configuration.eq_ignore_ascii_case("release") {
+                command.arg("-c").arg("release");
+            }
+            command.current_dir(root);
+            command
+        }
+        ProjectKind::XcodeProject | ProjectKind::XcodeWorkspace => {
+            let entry = info.entry_point.ok_or("Xcode project entry point is missing")?;
+            let mut command = Command::new("xcodebuild");
+            if matches!(info.kind, ProjectKind::XcodeProject) {
+                command.arg("-project");
+            } else {
+                command.arg("-workspace");
+            }
+            command.arg(entry);
+            append_xcode_selection(&mut command, &target, &scheme, &configuration);
+            command.arg("test").current_dir(root);
+            command
+        }
+        ProjectKind::Tuist => {
+            let mut command = Command::new("tuist");
+            command.arg("test");
+            if !scheme.trim().is_empty() {
+                command.arg(&scheme);
+            }
+            command.current_dir(root);
+            command
+        }
+        ProjectKind::Make => {
+            let mut command = Command::new("make");
+            command.arg("test").current_dir(root);
+            command
+        }
+        ProjectKind::Bazel => {
+            let mut command = Command::new("bazel");
+            command.args(["test", "//..."]).current_dir(root);
+            command
+        }
+        ProjectKind::CocoaPods => {
+            return Err("CocoaPods itself has no test command. Open its generated Xcode workspace to run tests.".to_string())
+        }
+        ProjectKind::Unknown => return Err("Crosscode could not identify a supported test system".to_string()),
+    };
+
+    window
+        .emit("build-output", format!("Testing {:?} project...", info.kind))
+        .map_err(|error| error.to_string())?;
+    pipe_command(&mut command, &window, true).await
+}
+
 fn append_xcode_selection(command: &mut Command, target: &str, scheme: &str, configuration: &str) {
     if !scheme.trim().is_empty() {
         command.arg("-scheme").arg(scheme);

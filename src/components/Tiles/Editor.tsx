@@ -1,7 +1,7 @@
 import { path } from "@tauri-apps/api";
 import "./Editor.css";
 import { IconButton, useColorScheme, Input, Typography } from "@mui/joy";
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import CloseIcon from "@mui/icons-material/Close";
 import CircleIcon from "@mui/icons-material/Circle";
 import * as monaco from "monaco-editor";
@@ -18,6 +18,9 @@ import { TabLike } from "../TabLike";
 import { useStore } from "../../utilities/StoreContext";
 import { useParams } from "react-router";
 import { readDir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { useIDE } from "../../utilities/IDEContext";
+import { BuildProblem, parseBuildProblems } from "../../utilities/build-results";
+import { defaultRemoteMacProfile, RemoteMacProfile } from "../../utilities/remote-mac";
 
 export type WorkerLoader = () => Worker;
 
@@ -30,6 +33,12 @@ type SearchResult = {
 
 const searchableExtensions = new Set(["swift", "tsx", "ts", "jsx", "js", "rs", "toml", "json", "css", "md"]);
 const ignoredDirectories = new Set([".git", ".build", "node_modules", "target", ".crosscode"]);
+
+function markerSeverity(severity: BuildProblem["severity"]): monaco.MarkerSeverity {
+  if (severity === "error") return monaco.MarkerSeverity.Error;
+  if (severity === "warning") return monaco.MarkerSeverity.Warning;
+  return monaco.MarkerSeverity.Info;
+}
 
 async function collectSearchFiles(root: string, output: string[] = []): Promise<string[]> {
   if (output.length >= 1500) return output;
@@ -149,7 +158,37 @@ export default ({
   const [formatOnSave] = useStore<boolean>("sourcekit/format", true);
 
   const { path: filePath } = useParams<"path">();
+  const { consoleLines } = useIDE();
+  const workspaceSelectionKey = `workspace/${encodeURIComponent(filePath ?? "")}`;
+  const [remoteMac] = useStore<RemoteMacProfile>(`${workspaceSelectionKey}/remote-mac`, defaultRemoteMacProfile);
+  const buildProblems = useMemo(
+    () => parseBuildProblems(consoleLines, filePath ?? "", remoteMac.projectPath),
+    [consoleLines, filePath, remoteMac.projectPath]
+  );
   const hasAttemptedToReadOpenFiles = useRef<string | null>(null);
+
+  useEffect(() => {
+    const openLocation = (event: Event) => {
+      const problem = (event as CustomEvent<BuildProblem>).detail;
+      if (!problem?.file) return;
+      const selection = {
+        startLineNumber: problem.line,
+        startColumn: problem.column,
+        endLineNumber: problem.line,
+        endColumn: problem.column + 1,
+      };
+      if (editor && focusedFile?.replace(/\\/g, "/") === problem.file.replace(/\\/g, "/")) {
+        editor.setSelection(selection);
+        editor.revealLineNearTop(problem.line);
+        editor.focus();
+        return;
+      }
+      selectionOverrideRef.current = { selection };
+      openNewFile(problem.file);
+    };
+    window.addEventListener("crosscode:open-location", openLocation);
+    return () => window.removeEventListener("crosscode:open-location", openLocation);
+  }, [editor, focusedFile, openNewFile]);
 
   useEffect(() => {
     (async () => {
@@ -346,6 +385,33 @@ export default ({
     if (!editor || !initialized) return;
     monaco.editor.setTheme(mode === "dark" ? "vs-dark" : "vs");
   }, [mode, editor, initialized, openFiles]);
+
+  useEffect(() => {
+    const problemsByFile = new Map<string, BuildProblem[]>();
+    for (const problem of buildProblems) {
+      const key = problem.file.replace(/\\/g, "/").toLowerCase();
+      const current = problemsByFile.get(key) ?? [];
+      current.push(problem);
+      problemsByFile.set(key, current);
+    }
+    for (const model of monaco.editor.getModels()) {
+      const key = model.uri.fsPath.replace(/\\/g, "/").toLowerCase();
+      const problems = problemsByFile.get(key) ?? [];
+      monaco.editor.setModelMarkers(
+        model,
+        "crosscode-build",
+        problems.map((problem) => ({
+          severity: markerSeverity(problem.severity),
+          message: problem.message,
+          startLineNumber: problem.line,
+          startColumn: problem.column,
+          endLineNumber: problem.line,
+          endColumn: problem.column + 1,
+          source: "Build",
+        }))
+      );
+    }
+  }, [buildProblems, editor, focused, tabs]);
 
   useEffect(() => {
     const handleQuickOpen = (event: KeyboardEvent) => {

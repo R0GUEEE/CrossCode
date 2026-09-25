@@ -16,6 +16,7 @@ import {
   Refresh,
   CleaningServices,
   CameraAlt,
+  Science,
 } from "@mui/icons-material";
 import { useParams } from "react-router-dom";
 import { Divider, Option, Select } from "@mui/joy";
@@ -282,6 +283,21 @@ export default function MenuBar({ callbacks, editor }: MenuBarProps) {
           remoteMac,
         }}
         tooltip="Build selected target"
+        sx={{ marginRight: 0 }}
+      />
+      <CommandButton
+        variant="plain"
+        command="test_project"
+        icon={<Science />}
+        parameters={{
+          projectPath: path,
+          toolchainPath: selectedToolchain?.path ?? "",
+          target: selectedTarget,
+          scheme: selectedScheme,
+          configuration: selectedConfiguration,
+          remoteMac,
+        }}
+        tooltip="Test selected workspace"
         sx={{ marginRight: 0 }}
       />
       <Divider orientation="vertical" />
