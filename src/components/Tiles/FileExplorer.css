@@ -2,3 +2,32 @@
   overflow-y: auto;
   height: 100%;
 }
+
+.file-explorer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  padding: 2px 6px;
+  border-bottom: 1px solid var(--joy-palette-divider);
+}
+
+.file-explorer-collapsed {
+  overflow: hidden;
+  min-width: 34px;
+}
+
+.file-explorer-collapsed .file-explorer-header {
+  justify-content: center;
+  padding-inline: 2px;
+}
+
+.file-explorer-rail-label {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.65;
+}

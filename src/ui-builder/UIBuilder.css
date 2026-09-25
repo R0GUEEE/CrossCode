@@ -250,6 +250,30 @@
   display: none;
 }
 
+.uib-device-dark {
+  background: #1c1c1e;
+  color: #f2f2f7;
+}
+
+.uib-device-dark .uib-screen {
+  background: #1c1c1e;
+}
+
+.uib-device-landscape {
+  width: 640px;
+  min-height: 380px;
+}
+
+.uib-device-landscape.uib-device-ipad {
+  width: 700px;
+  min-height: 500px;
+}
+
+.uib-device-landscape.uib-device-mac {
+  width: 860px;
+  min-height: 460px;
+}
+
 .uib-statusbar {
   display: flex;
   justify-content: space-between;

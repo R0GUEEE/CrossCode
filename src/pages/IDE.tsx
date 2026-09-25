@@ -44,6 +44,7 @@ export default () => {
   const { storeInitialized, store } = useContext(StoreContext);
   const [openFile, setOpenFile] = useState<string | null>(null);
   const [openFiles, setOpenFiles] = useState<string[]>([]);
+  const [navigatorCollapsed, setNavigatorCollapsed] = useState(false);
   const [saveFile, setSaveFile] = useState<(() => Promise<void>) | null>(null);
   const [undo, setUndo] = useState<(() => void) | null>(null);
   const [redo, setRedo] = useState<(() => void) | null>(null);
@@ -238,6 +239,8 @@ export default () => {
           <FileExplorer
             openFolder={path}
             setOpenFile={openNewFile}
+            collapsed={navigatorCollapsed}
+            onToggleCollapsed={() => setNavigatorCollapsed((value) => !value)}
             openInUIBuilder={(file) => {
               openNewFile(file);
               setUIBuilderOpen(true);

@@ -151,8 +151,10 @@ export interface FileExplorerProps {
   openFolder: string;
   setOpenFile: (file: string) => void;
   openInUIBuilder: (file: string) => void;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }
-export default ({ openFolder, setOpenFile, openInUIBuilder }: FileExplorerProps) => {
+export default ({ openFolder, setOpenFile, openInUIBuilder, collapsed = false, onToggleCollapsed }: FileExplorerProps) => {
   const [contextMenu, setContextMenu] = useState<{
     mouseX: number;
     mouseY: number;
@@ -258,7 +260,21 @@ export default ({ openFolder, setOpenFile, openInUIBuilder }: FileExplorerProps)
   };
 
   return (
-    <div className={"file-explorer"} onContextMenu={handleContextMenu}>
+    <div className={`file-explorer${collapsed ? " file-explorer-collapsed" : ""}`} onContextMenu={handleContextMenu}>
+      <div className="file-explorer-header">
+        {!collapsed && <Typography level="title-sm">Project</Typography>}
+        <Button
+          size="sm"
+          variant="plain"
+          title={collapsed ? "Expand project navigator" : "Collapse project navigator"}
+          onClick={onToggleCollapsed}
+        >
+          {collapsed ? "›" : "‹"}
+        </Button>
+      </div>
+      {collapsed ? (
+        <div className="file-explorer-rail-label" aria-label="Project navigator collapsed">P</div>
+      ) : (
       <FileItem
         filePath={openFolder}
         isDirectory={true}
@@ -266,6 +282,8 @@ export default ({ openFolder, setOpenFile, openInUIBuilder }: FileExplorerProps)
         openDefault={true}
         refresh={refresh}
       />
+      )}
+      {!collapsed && <>
       <ClickAwayListener onClickAway={handleClose}>
         <Menu
           size="sm"
@@ -369,6 +387,7 @@ export default ({ openFolder, setOpenFile, openInUIBuilder }: FileExplorerProps)
           </MenuItem>
         </Menu>
       </ClickAwayListener>
+      </>}
 
       {/* New File Modal */}
       <Modal open={newOpen} onClose={() => setNewOpen(false)}>

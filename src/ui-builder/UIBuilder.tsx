@@ -293,6 +293,8 @@ const Canvas = ({
   previewDevice,
   previewScale,
   streamedImage,
+  previewAppearance,
+  previewOrientation,
   selectedId,
   onSelect,
   onDropOnNode,
@@ -302,6 +304,8 @@ const Canvas = ({
   previewDevice: "iphone" | "ipad" | "mac";
   previewScale: number;
   streamedImage: string | null;
+  previewAppearance: "light" | "dark";
+  previewOrientation: "portrait" | "landscape";
   selectedId: string | null;
   onSelect: (id: string) => void;
   onDropOnNode: (event: DragEvent, target: UINode) => void;
@@ -315,7 +319,7 @@ const Canvas = ({
       </div>
     )}
     <div
-      className={`uib-device uib-device-${previewDevice}`}
+      className={`uib-device uib-device-${previewDevice} uib-device-${previewOrientation} uib-device-${previewAppearance}`}
       style={{ transform: `scale(${previewScale})`, transformOrigin: "top center" }}
       onDragOver={(event) => event.preventDefault()}
       onDrop={onDropOnRoot}
@@ -962,6 +966,8 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
   const selected = selectedId ? findNode(doc.root, selectedId) : null;
   const [previewDevice, setPreviewDevice] = useState<"iphone" | "ipad" | "mac">("iphone");
   const [previewScale, setPreviewScale] = useState(1);
+  const [previewAppearance, setPreviewAppearance] = useState<"light" | "dark">("light");
+  const [previewOrientation, setPreviewOrientation] = useState<"portrait" | "landscape">("portrait");
   const [streamedImage, setStreamedImage] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [autoBuild, setAutoBuild] = useState(false);
@@ -1075,6 +1081,12 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
           </Button>
           <Button size="sm" variant={autoBuild ? "soft" : "plain"} disabled={!selectedDevice} onClick={() => setAutoBuild((value) => !value)}>
             {autoBuild ? "Auto Build On" : "Auto Build"}
+          </Button>
+          <Button size="sm" variant="plain" onClick={() => setPreviewAppearance((value) => value === "light" ? "dark" : "light")}>
+            {previewAppearance === "light" ? "Dark" : "Light"}
+          </Button>
+          <Button size="sm" variant="plain" onClick={() => setPreviewOrientation((value) => value === "portrait" ? "landscape" : "portrait")}>
+            {previewOrientation === "portrait" ? "Landscape" : "Portrait"}
           </Button>
           <Select
             size="sm"
@@ -1279,6 +1291,8 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
           previewDevice={previewDevice}
           previewScale={previewScale}
           streamedImage={streamedImage}
+          previewAppearance={previewAppearance}
+          previewOrientation={previewOrientation}
           selectedId={selectedId}
           onSelect={setSelectedId}
           onDropOnNode={handleDropOnNode}
