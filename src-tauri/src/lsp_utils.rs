@@ -171,13 +171,14 @@ pub async fn test_project(
         let entry_name = PathBuf::from(entry)
             .file_name()
             .and_then(|name| name.to_str())
-            .ok_or("Xcode project entry point has an invalid name")?;
+            .ok_or("Xcode project entry point has an invalid name")?
+            .to_string();
         let project_flag = if matches!(info.kind, ProjectKind::XcodeProject) {
             "-project"
         } else {
             "-workspace"
         };
-        let mut arguments = vec![project_flag.to_string(), shell_quote(entry_name)];
+        let mut arguments = vec![project_flag.to_string(), shell_quote(&entry_name)];
         append_xcode_arguments(&mut arguments, &target, &scheme, &configuration);
         arguments.push("test".to_string());
         let remote_command = format!(
