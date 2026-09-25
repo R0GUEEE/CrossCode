@@ -6,6 +6,91 @@ use crate::builder::swift::SwiftBin;
 
 pub const FORMAT_VERSION: u32 = 1;
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectKind {
+    CrosscodePackage,
+    SwiftPackage,
+    XcodeWorkspace,
+    XcodeProject,
+    CocoaPods,
+    Tuist,
+    Make,
+    Bazel,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectInfo {
+    pub kind: ProjectKind,
+    pub root: String,
+    pub entry_point: Option<String>,
+    pub capabilities: Vec<String>,
+}
+
+impl ProjectInfo {
+    pub fn detect(root: PathBuf) -> Result<Self, String> {
+        if !root.is_dir() {
+            return Err(format!("Project path is not a directory: {}", root.display()));
+        }
+
+        let mut entries = std::fs::read_dir(&root)
+            .map_err(|e| format!("Failed to read project directory: {}", e))?
+            .filter_map(Result::ok)
+            .collect::<Vec<_>>();
+        entries.sort_by_key(|entry| entry.file_name());
+
+        let has = |name: &str| root.join(name).exists();
+        let find_extension = |extension: &str| {
+            entries.iter().find_map(|entry| {
+                let path = entry.path();
+                (path.extension().and_then(|value| value.to_str()) == Some(extension))
+                    .then(|| path)
+            })
+        };
+
+        let (kind, entry_point) = if let Some(path) = find_extension("xcworkspace") {
+            (ProjectKind::XcodeWorkspace, Some(path))
+        } else if let Some(path) = find_extension("xcodeproj") {
+            (ProjectKind::XcodeProject, Some(path))
+        } else if has("Package.swift") && has("crosscode.toml") {
+            (ProjectKind::CrosscodePackage, Some(root.join("Package.swift")))
+        } else if has("Package.swift") {
+            (ProjectKind::SwiftPackage, Some(root.join("Package.swift")))
+        } else if has("Podfile") {
+            (ProjectKind::CocoaPods, Some(root.join("Podfile")))
+        } else if has("Project.swift") || has("Tuist.swift") || has("ProjectDescriptionHelpers") {
+            (ProjectKind::Tuist, find_extension("swift"))
+        } else if has("Makefile") || has("makefile") {
+            (ProjectKind::Make, Some(if has("Makefile") { root.join("Makefile") } else { root.join("makefile") }))
+        } else if has("WORKSPACE") || has("BUILD") || has("MODULE.bazel") {
+            (ProjectKind::Bazel, find_extension("bazel"))
+        } else {
+            (ProjectKind::Unknown, None)
+        };
+
+        let mut capabilities = vec!["edit".to_string(), "sourceKitLsp".to_string()];
+        if matches!(kind, ProjectKind::XcodeProject | ProjectKind::XcodeWorkspace) {
+            capabilities.push("xcodeBuild".to_string());
+            capabilities.push("simulator".to_string());
+        }
+        if matches!(kind, ProjectKind::SwiftPackage | ProjectKind::CrosscodePackage | ProjectKind::Tuist | ProjectKind::Make | ProjectKind::Bazel) {
+            capabilities.push("swiftBuild".to_string());
+        }
+        if matches!(kind, ProjectKind::CocoaPods) {
+            capabilities.push("cocoapods".to_string());
+        }
+
+        Ok(ProjectInfo {
+            kind,
+            root: root.to_string_lossy().to_string(),
+            entry_point: entry_point.map(|path| path.to_string_lossy().to_string()),
+            capabilities,
+        })
+    }
+}
+
 pub struct BuildSettings {
     pub debug: bool,
 }

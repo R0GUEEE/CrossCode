@@ -1,8 +1,12 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process::Command};
 
 use sysinfo::System;
+use tauri::Emitter;
 
-use crate::builder::config::{ProjectConfig, ProjectValidation};
+use crate::builder::{
+    config::{ProjectConfig, ProjectInfo, ProjectKind, ProjectValidation},
+    swift::{pipe_command, SwiftBin},
+};
 
 #[tauri::command]
 pub fn has_limited_ram() -> bool {
@@ -15,6 +19,70 @@ pub fn has_limited_ram() -> bool {
 #[tauri::command]
 pub fn validate_project(project_path: String, toolchain_path: String) -> ProjectValidation {
     ProjectConfig::validate(PathBuf::from(project_path), &toolchain_path)
+}
+
+#[tauri::command]
+pub fn detect_project(project_path: String) -> Result<ProjectInfo, String> {
+    ProjectInfo::detect(PathBuf::from(project_path))
+}
+
+#[tauri::command]
+pub async fn build_project(
+    window: tauri::Window,
+    project_path: String,
+    toolchain_path: String,
+) -> Result<(), String> {
+    let root = PathBuf::from(&project_path);
+    let info = ProjectInfo::detect(root.clone())?;
+
+    let mut command = match info.kind {
+        ProjectKind::CrosscodePackage | ProjectKind::SwiftPackage => {
+            let swift = SwiftBin::new(&toolchain_path)?;
+            let mut command = swift.command();
+            command.arg("build").current_dir(root);
+            command
+        }
+        ProjectKind::XcodeProject => {
+            let entry = info.entry_point.ok_or("Xcode project entry point is missing")?;
+            let mut command = Command::new("xcodebuild");
+            command.arg("-project").arg(&entry).arg("build").current_dir(root);
+            command
+        }
+        ProjectKind::XcodeWorkspace => {
+            let entry = info.entry_point.ok_or("Xcode workspace entry point is missing")?;
+            let mut command = Command::new("xcodebuild");
+            command.arg("-workspace").arg(&entry).arg("build").current_dir(root);
+            command
+        }
+        ProjectKind::CocoaPods => {
+            let mut command = Command::new("pod");
+            command.args(["install"]).current_dir(root);
+            command
+        }
+        ProjectKind::Tuist => {
+            let mut command = Command::new("tuist");
+            command.args(["generate", "--no-open"]).current_dir(root);
+            command
+        }
+        ProjectKind::Make => {
+            let mut command = Command::new("make");
+            command.current_dir(root);
+            command
+        }
+        ProjectKind::Bazel => {
+            let mut command = Command::new("bazel");
+            command.args(["build", "//..."]).current_dir(root);
+            command
+        }
+        ProjectKind::Unknown => {
+            return Err("Crosscode could not identify a supported project build system".to_string())
+        }
+    };
+
+    window
+        .emit("build-output", format!("Building {:?} project...", info.kind))
+        .map_err(|error| error.to_string())?;
+    pipe_command(&mut command, &window, true).await
 }
 
 // #[tauri::command]

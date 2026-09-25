@@ -38,6 +38,13 @@ type ProjectValidation =
   | "InvalidPackage"
   | "InvalidToolchain";
 
+type ProjectInfo = {
+  kind: string;
+  root: string;
+  entryPoint: string | null;
+  capabilities: string[];
+};
+
 let autoStartedLsp = "";
 
 export default () => {
@@ -86,6 +93,7 @@ export default () => {
   const navigate = useNavigate();
   const [projectValidation, setProjectValidation] =
     useState<ProjectValidation | null>(null);
+  const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
   const [editor, setEditor] = useState<IStandaloneCodeEditor | null>(null);
   const { addToast } = useToast();
 
@@ -129,6 +137,13 @@ export default () => {
       }
     })();
   }, [path, selectedToolchain, initialized]);
+
+  useEffect(() => {
+    if (!path) return;
+    invoke<ProjectInfo>("detect_project", { projectPath: path })
+      .then(setProjectInfo)
+      .catch((error) => console.warn("Failed to detect project type", error));
+  }, [path]);
 
   useEffect(() => {
     if (openFiles.length === 0) {
@@ -230,6 +245,13 @@ export default () => {
   return (
     <div className="ide-container">
       <MenuBar callbacks={callbacks} editor={editor} />
+      {projectInfo && (
+        <div className="project-kind-bar">
+          <span className="project-kind-label">Project</span>
+          <span>{formatProjectKind(projectInfo.kind)}</span>
+          {projectInfo.entryPoint && <span className="project-entry-point">{projectInfo.entryPoint}</span>}
+        </div>
+      )}
       <Splitter
         gutterTheme={theme === "dark" ? GutterTheme.Dark : GutterTheme.Light}
         direction={SplitDirection.Horizontal}
@@ -495,4 +517,8 @@ function getValidationMsg(validation: ProjectValidation): string {
     default:
       return "";
   }
+}
+
+function formatProjectKind(kind: string): string {
+  return kind.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (value) => value.toUpperCase());
 }

@@ -4,6 +4,30 @@
   flex-direction: column;
 }
 
+.project-kind-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--padding-sm);
+  min-height: 24px;
+  padding: 0 var(--padding-sm);
+  border-bottom: 1px solid var(--joy-palette-divider);
+  color: var(--joy-palette-neutral-500);
+  font-size: 11px;
+}
+
+.project-kind-label {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.project-entry-point {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
 .file-explorer-tile {
   padding-right: 0.5rem;
 }

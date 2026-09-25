@@ -23,7 +23,7 @@ use builder::swift::{
     build_swift, clean_swift, deploy_swift, get_swiftly_toolchains, get_toolchain_info,
     has_darwin_sdk, validate_toolchain,
 };
-use lsp_utils::{has_limited_ram, validate_project};
+use lsp_utils::{build_project, detect_project, has_limited_ram, validate_project};
 use serde_json::Value;
 use sideloader::{
     apple_commands::{
@@ -143,6 +143,8 @@ fn main() {
             get_server_status,
             has_limited_ram,
             validate_project,
+            detect_project,
+            build_project,
             linux_path,
             windows_path,
             start_stream_syslog,
