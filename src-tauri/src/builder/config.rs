@@ -27,6 +27,9 @@ pub struct ProjectInfo {
     pub root: String,
     pub entry_point: Option<String>,
     pub capabilities: Vec<String>,
+    pub targets: Vec<String>,
+    pub schemes: Vec<String>,
+    pub configurations: Vec<String>,
 }
 
 impl ProjectInfo {
@@ -70,6 +73,8 @@ impl ProjectInfo {
             (ProjectKind::Unknown, None)
         };
 
+        let (targets, schemes) = discover_targets_and_schemes(&root, entry_point.as_ref(), &kind);
+
         let mut capabilities = vec!["edit".to_string(), "sourceKitLsp".to_string()];
         if matches!(kind, ProjectKind::XcodeProject | ProjectKind::XcodeWorkspace) {
             capabilities.push("xcodeBuild".to_string());
@@ -87,8 +92,69 @@ impl ProjectInfo {
             root: root.to_string_lossy().to_string(),
             entry_point: entry_point.map(|path| path.to_string_lossy().to_string()),
             capabilities,
+            targets,
+            schemes,
+            configurations: vec!["Debug".to_string(), "Release".to_string()],
         })
     }
+}
+
+fn discover_targets_and_schemes(
+    root: &PathBuf,
+    entry_point: Option<&PathBuf>,
+    kind: &ProjectKind,
+) -> (Vec<String>, Vec<String>) {
+    let mut targets = Vec::new();
+    let mut schemes = Vec::new();
+    if matches!(kind, ProjectKind::SwiftPackage | ProjectKind::CrosscodePackage) {
+        if let Ok(contents) = std::fs::read_to_string(root.join("Package.swift")) {
+            for marker in ["target(name:", "executableTarget(name:", "testTarget(name:"] {
+                let mut rest = contents.as_str();
+                while let Some(index) = rest.find(marker) {
+                    rest = &rest[index + marker.len()..];
+                    if let Some(start) = rest.find('"') {
+                        let value = &rest[start + 1..];
+                        if let Some(end) = value.find('"') {
+                            let name = value[..end].to_string();
+                            if !targets.contains(&name) { targets.push(name); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if matches!(kind, ProjectKind::XcodeProject | ProjectKind::XcodeWorkspace) {
+        if let Some(entry) = entry_point {
+            let project_root = if entry.extension().and_then(|value| value.to_str()) == Some("xcodeproj") {
+                entry.join("project.pbxproj")
+            } else {
+                root.join("project.pbxproj")
+            };
+            if let Ok(contents) = std::fs::read_to_string(project_root) {
+                for line in contents.lines() {
+                    if line.contains("name =") && line.contains("; /*") {
+                        let name = line.split("name =").nth(1).unwrap_or("").split(';').next().unwrap_or("").trim().trim_matches('"');
+                        if !name.is_empty() && !targets.contains(&name.to_string()) { targets.push(name.to_string()); }
+                    }
+                }
+            }
+        }
+        if let Ok(entries) = std::fs::read_dir(root) {
+            for entry in entries.flatten() {
+                let schemes_dir = entry.path().join("xcshareddata").join("xcschemes");
+                if let Ok(scheme_entries) = std::fs::read_dir(schemes_dir) {
+                    for scheme in scheme_entries.flatten() {
+                        if scheme.path().extension().and_then(|value| value.to_str()) == Some("xcscheme") {
+                            if let Some(name) = scheme.path().file_stem().and_then(|value| value.to_str()) { schemes.push(name.to_string()); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    targets.sort();
+    schemes.sort();
+    (targets, schemes)
 }
 
 pub struct BuildSettings {

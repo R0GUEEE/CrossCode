@@ -17,6 +17,8 @@ import {
   Modal,
   ModalClose,
   ModalDialog,
+  Option,
+  Select,
   Typography,
 } from "@mui/joy";
 import { ErrorIcon, useToast, WarningIcon } from "react-toast-plus";
@@ -43,6 +45,9 @@ type ProjectInfo = {
   root: string;
   entryPoint: string | null;
   capabilities: string[];
+  targets: string[];
+  schemes: string[];
+  configurations: string[];
 };
 
 let autoStartedLsp = "";
@@ -94,6 +99,8 @@ export default () => {
   const [projectValidation, setProjectValidation] =
     useState<ProjectValidation | null>(null);
   const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
+  const [selectedTarget, setSelectedTarget] = useState("");
+  const [selectedScheme, setSelectedScheme] = useState("");
   const [editor, setEditor] = useState<IStandaloneCodeEditor | null>(null);
   const { addToast } = useToast();
 
@@ -141,7 +148,11 @@ export default () => {
   useEffect(() => {
     if (!path) return;
     invoke<ProjectInfo>("detect_project", { projectPath: path })
-      .then(setProjectInfo)
+      .then((info) => {
+        setProjectInfo(info);
+        setSelectedTarget(info.targets[0] ?? "");
+        setSelectedScheme(info.schemes[0] ?? "");
+      })
       .catch((error) => console.warn("Failed to detect project type", error));
   }, [path]);
 
@@ -249,6 +260,26 @@ export default () => {
         <div className="project-kind-bar">
           <span className="project-kind-label">Project</span>
           <span>{formatProjectKind(projectInfo.kind)}</span>
+          {projectInfo.targets.length > 0 && (
+            <Select
+              size="sm"
+              value={selectedTarget}
+              onChange={(_event, value) => setSelectedTarget(value ?? "")}
+              aria-label="Build target"
+            >
+              {projectInfo.targets.map((target) => <Option key={target} value={target}>{target}</Option>)}
+            </Select>
+          )}
+          {projectInfo.schemes.length > 0 && (
+            <Select
+              size="sm"
+              value={selectedScheme}
+              onChange={(_event, value) => setSelectedScheme(value ?? "")}
+              aria-label="Build scheme"
+            >
+              {projectInfo.schemes.map((scheme) => <Option key={scheme} value={scheme}>{scheme}</Option>)}
+            </Select>
+          )}
           {projectInfo.entryPoint && <span className="project-entry-point">{projectInfo.entryPoint}</span>}
         </div>
       )}

@@ -175,8 +175,9 @@ function sameLayout(a: UINode, b: UINode): boolean {
  */
 async function readSwiftView(path: string): Promise<SwiftImport | null> {
   try {
+    if (!path.toLowerCase().endsWith(".swift")) return null;
     const source = await readTextFile(path);
-    const name = path.slice(path.lastIndexOf("/") + 1).replace(/\.swift$/i, "");
+    const name = path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1).replace(/\.swift$/i, "");
     return parseSwiftDocument(source, { name });
   } catch (error) {
     console.warn("Failed to read Swift file", path, error);
@@ -731,23 +732,29 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
     // instead of the starter layout.
     const findExistingSwiftView = async (): Promise<{ path: string; imported: SwiftImport } | null> => {
       const { sourcesDirectory, viewName } = targetRef.current;
-      const root = normalizePath(packagePath);
       const candidates: string[] = [];
       const focused = focusedFileRef.current ? normalizePath(focusedFileRef.current) : "";
-      if (focused.toLowerCase().endsWith(".swift") && focused.startsWith(`${root}/`)) {
+      if (focused.toLowerCase().endsWith(".swift")) {
         candidates.push(focused);
       }
       candidates.push(`${sourcesDirectory}/${viewName}.swift`);
       candidates.push(`${sourcesDirectory}/${DEFAULT_VIEW_NAME}.swift`);
-      try {
-        for (const entry of await readDir(sourcesDirectory)) {
-          if (entry.isFile && entry.name.toLowerCase().endsWith(".swift")) {
-            candidates.push(`${sourcesDirectory}/${entry.name}`);
+      const collectSwiftFiles = async (directory: string, depth = 0): Promise<void> => {
+        if (depth > 8 || candidates.length > 200) return;
+        try {
+          for (const entry of await readDir(directory)) {
+            const entryPath = `${normalizePath(directory)}/${entry.name}`;
+            if (entry.isFile && entry.name.toLowerCase().endsWith(".swift")) {
+              candidates.push(entryPath);
+            } else if (entry.isDirectory && ![".build", ".git", "Pods", "node_modules"].includes(entry.name)) {
+              await collectSwiftFiles(entryPath, depth + 1);
+            }
           }
+        } catch {
+          // inaccessible directories are skipped
         }
-      } catch {
-        // the target folder may not exist yet
-      }
+      };
+      await collectSwiftFiles(sourcesDirectory);
       for (const path of [...new Set(candidates)]) {
         const imported = await readSwiftView(path);
         if (imported) return { path, imported };
