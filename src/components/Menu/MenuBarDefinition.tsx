@@ -12,6 +12,7 @@ import { restartServer } from "../../utilities/lsp-client";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useContext } from "react";
 import { UpdateContext } from "../../utilities/UpdateContext";
+import { defaultRemoteMacProfile, RemoteMacProfile } from "../../utilities/remote-mac";
 
 export default [
   {
@@ -214,16 +215,24 @@ export default [
             component: ({ shortcut }) => {
               const { path } = useParams<"path">();
               const { selectedToolchain } = useIDE();
+              const selectionKey = `workspace/${encodeURIComponent(path ?? "")}`;
+              const [target] = useStore<string>(`${selectionKey}/target`, "");
+              const [scheme] = useStore<string>(`${selectionKey}/scheme`, "");
+              const [configuration] = useStore<string>(`${selectionKey}/configuration`, "Debug");
+              const [remoteMac] = useStore<RemoteMacProfile>(`${selectionKey}/remote-mac`, defaultRemoteMacProfile);
               return (
                 <CommandButton
                   shortcut={shortcut}
-                  command="build_swift"
+                  command="build_project"
                   parameters={{
-                    folder: path,
+                    projectPath: path,
                     toolchainPath: selectedToolchain?.path ?? "",
-                    debug: true,
+                    target,
+                    scheme,
+                    configuration,
+                    remoteMac,
                   }}
-                  label="Build .ipa (Debug)"
+                  label="Build Selected Target"
                   useMenuItem
                   id="buildDebugMenuBtn"
                 />
@@ -237,16 +246,24 @@ export default [
             component: ({ shortcut }) => {
               const { path } = useParams<"path">();
               const { selectedToolchain } = useIDE();
+              const selectionKey = `workspace/${encodeURIComponent(path ?? "")}`;
+              const [target] = useStore<string>(`${selectionKey}/target`, "");
+              const [scheme] = useStore<string>(`${selectionKey}/scheme`, "");
+              const [configuration] = useStore<string>(`${selectionKey}/configuration`, "Release");
+              const [remoteMac] = useStore<RemoteMacProfile>(`${selectionKey}/remote-mac`, defaultRemoteMacProfile);
               return (
                 <CommandButton
                   shortcut={shortcut}
-                  command="build_swift"
+                  command="build_project"
                   parameters={{
-                    folder: path,
+                    projectPath: path,
                     toolchainPath: selectedToolchain?.path ?? "",
-                    debug: false,
+                    target,
+                    scheme,
+                    configuration,
+                    remoteMac,
                   }}
-                  label="Build .ipa (Release)"
+                  label="Build Selected Target (Release)"
                   useMenuItem
                   id="buildReleaseMenuBtn"
                 />

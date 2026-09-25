@@ -24,6 +24,7 @@ import { useStore } from "../../utilities/StoreContext";
 import { useToast } from "react-toast-plus";
 import bar from "./MenuBarDefinition";
 import { IStandaloneCodeEditor } from "@codingame/monaco-vscode-api/vscode/vs/editor/standalone/browser/standaloneCodeEditor";
+import { defaultRemoteMacProfile, RemoteMacProfile } from "../../utilities/remote-mac";
 
 export interface MenuBarProps {
   callbacks: Record<string, () => void>;
@@ -47,6 +48,11 @@ export default function MenuBar({ callbacks, editor }: MenuBarProps) {
     "apple-id/anisette-server",
     "ani.sidestore.io"
   );
+  const workspaceSelectionKey = `workspace/${encodeURIComponent(path ?? "")}`;
+  const [selectedTarget] = useStore<string>(`${workspaceSelectionKey}/target`, "");
+  const [selectedScheme] = useStore<string>(`${workspaceSelectionKey}/scheme`, "");
+  const [selectedConfiguration] = useStore<string>(`${workspaceSelectionKey}/configuration`, "Debug");
+  const [remoteMac] = useStore<RemoteMacProfile>(`${workspaceSelectionKey}/remote-mac`, defaultRemoteMacProfile);
   const { addToast } = useToast();
 
   const updateScreenshot = useCallback(
@@ -265,14 +271,17 @@ export default function MenuBar({ callbacks, editor }: MenuBarProps) {
       />
       <CommandButton
         variant="plain"
-        command="build_swift"
+        command="build_project"
         icon={<Construction />}
         parameters={{
-          folder: path,
+          projectPath: path,
           toolchainPath: selectedToolchain?.path ?? "",
-          debug: true,
+          target: selectedTarget,
+          scheme: selectedScheme,
+          configuration: selectedConfiguration,
+          remoteMac,
         }}
-        tooltip="Build .ipa"
+        tooltip="Build selected target"
         sx={{ marginRight: 0 }}
       />
       <Divider orientation="vertical" />

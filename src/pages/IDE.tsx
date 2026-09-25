@@ -13,7 +13,9 @@ import TauriFileSystemProvider from "../utilities/TauriFileSystemProvider";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Button,
+  Checkbox,
   Divider,
+  Input,
   Modal,
   ModalClose,
   ModalDialog,
@@ -29,7 +31,18 @@ import { open as openFileDialog, save } from "@tauri-apps/plugin-dialog";
 import { IStandaloneCodeEditor } from "@codingame/monaco-vscode-api/vscode/vs/editor/standalone/browser/standaloneCodeEditor";
 import { MIN_DARWIN_SDK_VERSION, isSupportedSDKVersion } from "../utilities/constants";
 import { writeFile } from "@tauri-apps/plugin-fs";
+import { readTextFile } from "@tauri-apps/plugin-fs";
 import UIBuilder from "../ui-builder/UIBuilder";
+import {
+  asArray,
+  asString,
+  configurationNames,
+  isaOf,
+  loadDocument,
+  objectAt,
+  objectName,
+} from "../xcode-import/pbxproj";
+import { defaultRemoteMacProfile, RemoteMacProfile } from "../utilities/remote-mac";
 
 export interface IDEProps {}
 
@@ -49,6 +62,39 @@ type ProjectInfo = {
   schemes: string[];
   configurations: string[];
 };
+
+type WorkspaceTarget = {
+  id: string;
+  name: string;
+  productType: string;
+  configurations: string[];
+};
+
+async function loadWorkspaceTargets(info: ProjectInfo): Promise<WorkspaceTarget[]> {
+  if (info.kind !== "xcodeProject" || !info.entryPoint) {
+    return info.targets.map((name) => ({
+      id: name,
+      name,
+      productType: "",
+      configurations: info.configurations,
+    }));
+  }
+
+  const contents = await readTextFile(`${info.entryPoint}/project.pbxproj`);
+  const document = loadDocument(contents, info.entryPoint);
+  return asArray(document.rootObject.targets)
+    .map((id) => asString(id))
+    .map((id) => {
+      const target = objectAt(document, id);
+      return {
+        id,
+        name: objectName(target),
+        productType: asString(target.productType),
+        configurations: configurationNames(document, asString(target.buildConfigurationList) || null),
+      };
+    })
+    .filter((target) => isaOf(objectAt(document, target.id)) === "PBXNativeTarget" && target.name.length > 0);
+}
 
 let autoStartedLsp = "";
 
@@ -99,8 +145,16 @@ export default () => {
   const [projectValidation, setProjectValidation] =
     useState<ProjectValidation | null>(null);
   const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
-  const [selectedTarget, setSelectedTarget] = useState("");
-  const [selectedScheme, setSelectedScheme] = useState("");
+  const [workspaceTargets, setWorkspaceTargets] = useState<WorkspaceTarget[]>([]);
+  const workspaceSelectionKey = `workspace/${encodeURIComponent(path)}`;
+  const [selectedTarget, setSelectedTarget] = useStore<string>(`${workspaceSelectionKey}/target`, "");
+  const [selectedScheme, setSelectedScheme] = useStore<string>(`${workspaceSelectionKey}/scheme`, "");
+  const [selectedConfiguration, setSelectedConfiguration] = useStore<string>(`${workspaceSelectionKey}/configuration`, "Debug");
+  const [remoteMac, setRemoteMac] = useStore<RemoteMacProfile>(
+    `${workspaceSelectionKey}/remote-mac`,
+    defaultRemoteMacProfile
+  );
+  const [remoteMacDialogOpen, setRemoteMacDialogOpen] = useState(false);
   const [editor, setEditor] = useState<IStandaloneCodeEditor | null>(null);
   const { addToast } = useToast();
 
@@ -148,13 +202,25 @@ export default () => {
   useEffect(() => {
     if (!path) return;
     invoke<ProjectInfo>("detect_project", { projectPath: path })
-      .then((info) => {
+      .then(async (info) => {
+        const targets = await loadWorkspaceTargets(info).catch((error) => {
+          console.warn("Failed to parse workspace targets", error);
+          return info.targets.map((name) => ({ id: name, name, productType: "", configurations: info.configurations }));
+        });
         setProjectInfo(info);
-        setSelectedTarget(info.targets[0] ?? "");
-        setSelectedScheme(info.schemes[0] ?? "");
+        setWorkspaceTargets(targets);
+        setSelectedTarget((current) => targets.some((target) => target.name === current) ? current : targets[0]?.name ?? "");
+        setSelectedScheme((current) => info.schemes.includes(current) ? current : info.schemes[0] ?? "");
+        setSelectedConfiguration((current) => {
+          const configurations = targets[0]?.configurations.length ? targets[0].configurations : info.configurations;
+          return configurations.includes(current) ? current : configurations[0] ?? "Debug";
+        });
       })
       .catch((error) => console.warn("Failed to detect project type", error));
   }, [path]);
+
+  const activeTarget = workspaceTargets.find((target) => target.name === selectedTarget) ?? null;
+  const configurations = activeTarget?.configurations.length ? activeTarget.configurations : projectInfo?.configurations ?? [];
 
   useEffect(() => {
     if (openFiles.length === 0) {
@@ -260,14 +326,19 @@ export default () => {
         <div className="project-kind-bar">
           <span className="project-kind-label">Project</span>
           <span>{formatProjectKind(projectInfo.kind)}</span>
-          {projectInfo.targets.length > 0 && (
+          {workspaceTargets.length > 0 && (
             <Select
               size="sm"
               value={selectedTarget}
-              onChange={(_event, value) => setSelectedTarget(value ?? "")}
+              onChange={(_event, value) => {
+                const nextTarget = value ?? "";
+                setSelectedTarget(nextTarget);
+                const configurations = workspaceTargets.find((target) => target.name === nextTarget)?.configurations;
+                if (configurations?.length) setSelectedConfiguration(configurations[0]);
+              }}
               aria-label="Build target"
             >
-              {projectInfo.targets.map((target) => <Option key={target} value={target}>{target}</Option>)}
+              {workspaceTargets.map((target) => <Option key={target.id} value={target.name}>{target.name}</Option>)}
             </Select>
           )}
           {projectInfo.schemes.length > 0 && (
@@ -279,6 +350,25 @@ export default () => {
             >
               {projectInfo.schemes.map((scheme) => <Option key={scheme} value={scheme}>{scheme}</Option>)}
             </Select>
+          )}
+          {configurations.length > 0 && (
+            <Select
+              size="sm"
+              value={selectedConfiguration}
+              onChange={(_event, value) => setSelectedConfiguration(value ?? "Debug")}
+              aria-label="Build configuration"
+            >
+              {configurations.map((configuration) => <Option key={configuration} value={configuration}>{configuration}</Option>)}
+            </Select>
+          )}
+          {(projectInfo.kind === "xcodeProject" || projectInfo.kind === "xcodeWorkspace") && (
+            <Button
+              size="sm"
+              variant={remoteMac.enabled ? "soft" : "plain"}
+              onClick={() => setRemoteMacDialogOpen(true)}
+            >
+              {remoteMac.enabled ? `Remote: ${remoteMac.host}` : "Remote Mac"}
+            </Button>
           )}
           {projectInfo.entryPoint && <span className="project-entry-point">{projectInfo.entryPoint}</span>}
         </div>
@@ -362,6 +452,61 @@ export default () => {
           </div>
         )}
       </Splitter>
+      <Modal open={remoteMacDialogOpen} onClose={() => setRemoteMacDialogOpen(false)}>
+        <ModalDialog sx={{ width: 480, maxWidth: "calc(100vw - 32px)" }}>
+          <ModalClose />
+          <Typography level="h3">Remote Mac Build</Typography>
+          <Typography level="body-sm">
+            Build this Xcode workspace over SSH. CrossCode uses your existing SSH key or agent; the project must already exist on the Mac.
+          </Typography>
+          <Checkbox
+            label="Use this Mac for Xcode builds"
+            checked={remoteMac.enabled}
+            onChange={(event) => setRemoteMac((profile) => ({ ...profile, enabled: event.target.checked }))}
+          />
+          <Input
+            placeholder="mac-mini.local"
+            value={remoteMac.host}
+            onChange={(event) => setRemoteMac((profile) => ({ ...profile, host: event.target.value }))}
+            aria-label="Remote Mac host"
+          />
+          <div className="remote-mac-row">
+            <Input
+              placeholder="macOS user"
+              value={remoteMac.user}
+              onChange={(event) => setRemoteMac((profile) => ({ ...profile, user: event.target.value }))}
+              aria-label="Remote Mac user"
+            />
+            <Input
+              type="number"
+              value={remoteMac.port}
+              onChange={(event) => setRemoteMac((profile) => ({ ...profile, port: Number(event.target.value) || 22 }))}
+              aria-label="SSH port"
+              sx={{ width: 100 }}
+            />
+          </div>
+          <Input
+            placeholder="/Users/me/Projects/MyApp"
+            value={remoteMac.projectPath}
+            onChange={(event) => setRemoteMac((profile) => ({ ...profile, projectPath: event.target.value }))}
+            aria-label="Project path on Remote Mac"
+          />
+          <div className="remote-mac-actions">
+            <Button
+              variant="outlined"
+              onClick={() => {
+                invoke("test_remote_mac", { remoteMac })
+                  .then(() => addToast.success("Remote Mac is ready for Xcode builds."))
+                  .catch((error) => addToast.error(String(error)));
+              }}
+              disabled={!remoteMac.host || !remoteMac.user || !remoteMac.projectPath}
+            >
+              Test Connection
+            </Button>
+            <Button onClick={() => setRemoteMacDialogOpen(false)}>Done</Button>
+          </div>
+        </ModalDialog>
+      </Modal>
       {initialized &&
         selectedToolchain !== null &&
         projectValidation !== null &&

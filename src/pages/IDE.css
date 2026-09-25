@@ -28,6 +28,17 @@
   opacity: 0.7;
 }
 
+.remote-mac-row,
+.remote-mac-actions {
+  display: flex;
+  gap: var(--padding-sm);
+}
+
+.remote-mac-actions {
+  justify-content: flex-end;
+  margin-top: var(--padding-sm);
+}
+
 .file-explorer-tile {
   padding-right: 0.5rem;
 }
