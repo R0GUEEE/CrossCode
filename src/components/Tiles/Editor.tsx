@@ -17,9 +17,40 @@ import { platform } from "@tauri-apps/plugin-os";
 import { TabLike } from "../TabLike";
 import { useStore } from "../../utilities/StoreContext";
 import { useParams } from "react-router";
-import { readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { readDir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 
 export type WorkerLoader = () => Worker;
+
+type SearchResult = {
+  file: string;
+  line: number;
+  column: number;
+  preview: string;
+};
+
+const searchableExtensions = new Set(["swift", "tsx", "ts", "jsx", "js", "rs", "toml", "json", "css", "md"]);
+const ignoredDirectories = new Set([".git", ".build", "node_modules", "target", ".crosscode"]);
+
+async function collectSearchFiles(root: string, output: string[] = []): Promise<string[]> {
+  if (output.length >= 1500) return output;
+  let entries;
+  try {
+    entries = await readDir(root);
+  } catch {
+    return output;
+  }
+  for (const entry of entries) {
+    if (output.length >= 1500) break;
+    const entryPath = await path.resolve(root, entry.name);
+    if (entry.isDirectory) {
+      if (!ignoredDirectories.has(entry.name)) await collectSearchFiles(entryPath, output);
+      continue;
+    }
+    const extension = entry.name.split(".").pop()?.toLowerCase();
+    if (extension && searchableExtensions.has(extension)) output.push(entryPath);
+  }
+  return output;
+}
 const workerLoaders: Partial<Record<string, WorkerLoader>> = {
   TextEditorWorker: () =>
     new Worker(
@@ -110,6 +141,10 @@ export default ({
   const [hoveredOnBtn, setHoveredOnBtn] = useState<number | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickFilter, setQuickFilter] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [formatOnSave] = useStore<boolean>("sourcekit/format", true);
 
@@ -319,11 +354,52 @@ export default ({
         setQuickOpen(true);
         setQuickFilter("");
       }
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setSearchOpen(true);
+        setSearchQuery("");
+      }
       if (event.key === "Escape") setQuickOpen(false);
+      if (event.key === "Escape") setSearchOpen(false);
     };
     document.addEventListener("keydown", handleQuickOpen);
     return () => document.removeEventListener("keydown", handleQuickOpen);
   }, []);
+
+  useEffect(() => {
+    if (!searchOpen || !filePath || searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setSearching(true);
+      const results: SearchResult[] = [];
+      const query = searchQuery.toLowerCase();
+      const files = await collectSearchFiles(filePath);
+      for (const file of files) {
+        if (cancelled || results.length >= 200) break;
+        try {
+          const content = await readTextFile(file);
+          content.split(/\r?\n/).forEach((line, index) => {
+            if (results.length >= 200) return;
+            const column = line.toLowerCase().indexOf(query);
+            if (column >= 0) results.push({ file, line: index + 1, column: column + 1, preview: line.trim() });
+          });
+        } catch {
+          // Ignore unreadable or binary files.
+        }
+      }
+      if (!cancelled) {
+        setSearchResults(results);
+        setSearching(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [filePath, searchOpen, searchQuery]);
 
   useEffect(() => {
     if (!editor) return;
@@ -527,6 +603,39 @@ export default ({
 
   return (
     <div className={"editor"}>
+      {searchOpen && (
+        <div className="quick-open-backdrop" onClick={() => setSearchOpen(false)}>
+          <div className="quick-open project-search" onClick={(event) => event.stopPropagation()}>
+            <Input
+              autoFocus
+              placeholder="Search project…"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Escape") setSearchOpen(false); }}
+            />
+            <div className="quick-open-hint">
+              {searching ? "Searching…" : `${searchResults.length} result${searchResults.length === 1 ? "" : "s"}`} · Ctrl/⌘ Shift F
+            </div>
+            <div className="quick-open-results">
+              {searchResults.map((result, index) => (
+                <button
+                  key={`${result.file}:${result.line}:${index}`}
+                  onClick={() => {
+                    selectionOverrideRef.current = { selection: { startLineNumber: result.line, startColumn: result.column, endLineNumber: result.line, endColumn: result.column + Math.max(searchQuery.length, 1) } };
+                    openNewFile(result.file);
+                    setSearchOpen(false);
+                  }}
+                >
+                  <span>{result.preview || "(blank line)"}</span>
+                  <small>{result.file}:{result.line}:{result.column}</small>
+                </button>
+              ))}
+              {!searching && searchQuery.trim().length < 2 && <Typography level="body-sm">Type at least two characters to search.</Typography>}
+              {!searching && searchQuery.trim().length >= 2 && searchResults.length === 0 && <Typography level="body-sm">No matches found.</Typography>}
+            </div>
+          </div>
+        </div>
+      )}
       {quickOpen && (
         <div className="quick-open-backdrop" onClick={() => setQuickOpen(false)}>
           <div className="quick-open" onClick={(event) => event.stopPropagation()}>
