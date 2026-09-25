@@ -38,6 +38,8 @@ import {
 import type { Props, UIDocument, UINode } from "./types";
 import { joinPath, normalizePath } from "../xcode-import/project-files";
 import { useIDE } from "../utilities/IDEContext";
+import { useStore } from "../utilities/StoreContext";
+import { useCommandRunner } from "../utilities/Command";
 import "./UIBuilder.css";
 
 /** One SwiftPM package of the workspace, as reported by the backend. */
@@ -57,6 +59,15 @@ export type SwiftPackage = {
 
 const PALETTE_MIME = "application/x-crosscode-ui-kind";
 const NODE_MIME = "application/x-crosscode-ui-node";
+
+function bytesToBase64(bytes: number[]): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.slice(index, index + chunkSize));
+  }
+  return btoa(binary);
+}
 
 export interface UIBuilderProps {
   projectPath: string;
@@ -256,20 +267,33 @@ const NodeView = ({ node: current, selectedId, onSelect, onDropOnNode }: NodeVie
 
 const Canvas = ({
   doc,
+  previewDevice,
+  previewScale,
+  streamedImage,
   selectedId,
   onSelect,
   onDropOnNode,
   onDropOnRoot,
 }: {
   doc: UIDocument;
+  previewDevice: "iphone" | "ipad" | "mac";
+  previewScale: number;
+  streamedImage: string | null;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onDropOnNode: (event: DragEvent, target: UINode) => void;
   onDropOnRoot: (event: DragEvent) => void;
 }) => (
   <div className="uib-canvas" onClick={() => onSelect(doc.root.id)}>
+    {streamedImage && (
+      <div className="uib-streamed-preview">
+        <div className="uib-group-title">Simulator stream</div>
+        <img src={streamedImage} alt="Live simulator preview" />
+      </div>
+    )}
     <div
-      className="uib-device"
+      className={`uib-device uib-device-${previewDevice}`}
+      style={{ transform: `scale(${previewScale})`, transformOrigin: "top center" }}
       onDragOver={(event) => event.preventDefault()}
       onDrop={onDropOnRoot}
     >
@@ -516,6 +540,9 @@ const Inspector = ({
 
 export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderProps) => {
   const { selectedToolchain } = useIDE();
+  const { selectedDevice, mountDdi } = useIDE();
+  const [anisetteServer] = useStore<string>("apple-id/anisette-server", "ani.sidestore.io");
+  const { runCommand, isRunningCommand } = useCommandRunner();
   const [doc, setDoc] = useState<UIDocument>(starterDocument);
   const [packages, setPackages] = useState<SwiftPackage[]>([]);
   const [packagesError, setPackagesError] = useState<string | null>(null);
@@ -911,11 +938,87 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
   }, [addToast]);
 
   const selected = selectedId ? findNode(doc.root, selectedId) : null;
+  const [previewDevice, setPreviewDevice] = useState<"iphone" | "ipad" | "mac">("iphone");
+  const [previewScale, setPreviewScale] = useState(1);
+  const [streamedImage, setStreamedImage] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState(false);
+
+  const capturePreview = useCallback(async () => {
+    if (!selectedDevice) return;
+    try {
+      if (!(await mountDdi(false))) return;
+      const bytes = await invoke<number[]>("take_screenshot", { device: selectedDevice });
+      setStreamedImage(`data:image/png;base64,${bytesToBase64(bytes)}`);
+    } catch (error) {
+      console.error("Failed to stream simulator preview", error);
+    }
+  }, [mountDdi, selectedDevice]);
+
+  const buildAndStream = useCallback(async () => {
+    if (!selectedDevice) {
+      addToast.error("Select a simulator or device first.");
+      return;
+    }
+    if (!selectedToolchain) {
+      addToast.error("Select a Swift toolchain first.");
+      return;
+    }
+    if (!(await saveSwift())) return;
+    if (!(await mountDdi(true))) return;
+    try {
+      await runCommand("deploy_swift", {
+        folder: projectPath,
+        anisetteServer,
+        device: selectedDevice,
+        toolchainPath: selectedToolchain.path,
+        debug: true,
+      });
+      await capturePreview();
+      setStreaming(true);
+      addToast.success("Built, installed, and streaming preview.");
+    } catch (error) {
+      addToast.error(`Preview deployment failed: ${error}`);
+    }
+  }, [addToast, anisetteServer, capturePreview, mountDdi, projectPath, runCommand, saveSwift, selectedDevice, selectedToolchain]);
+
+  useEffect(() => {
+    if (!streaming || !selectedDevice) return;
+    void capturePreview();
+    const timer = window.setInterval(() => void capturePreview(), 1500);
+    return () => window.clearInterval(timer);
+  }, [capturePreview, selectedDevice, streaming]);
 
   return (
     <div className="uib-root">
       <div className="uib-header">
         <Typography level="title-sm">UI Builder</Typography>
+        <div className="uib-preview-controls" aria-label="SwiftUI live preview controls">
+          <span className="uib-live-indicator" aria-hidden="true" />
+          <Typography level="body-xs">Live Preview</Typography>
+          <Button size="sm" variant={streaming ? "soft" : "plain"} disabled={!selectedDevice} onClick={() => setStreaming((value) => !value)}>
+            {streaming ? "Streaming" : "Stream Device"}
+          </Button>
+          <Button size="sm" variant="soft" loading={isRunningCommand} disabled={!selectedDevice || isRunningCommand} onClick={() => void buildAndStream()}>
+            Build & Stream
+          </Button>
+          <Select
+            size="sm"
+            value={previewDevice}
+            onChange={(_event, value) => {
+              if (value === "iphone" || value === "ipad" || value === "mac") setPreviewDevice(value);
+            }}
+            aria-label="Preview device"
+          >
+            <Option value="iphone">iPhone</Option>
+            <Option value="ipad">iPad</Option>
+            <Option value="mac">Mac</Option>
+          </Select>
+          <Button size="sm" variant="plain" onClick={() => setPreviewScale((scale) => Math.max(0.6, scale - 0.1))}>−</Button>
+          <Typography level="body-xs" sx={{ minWidth: "3ch", textAlign: "center" }}>
+            {Math.round(previewScale * 100)}%
+          </Typography>
+          <Button size="sm" variant="plain" onClick={() => setPreviewScale((scale) => Math.min(1.4, scale + 0.1))}>+</Button>
+        </div>
         <div className="uib-package-picker">
           <label>
             Package
@@ -1074,6 +1177,9 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
         </div>
         <Canvas
           doc={doc}
+          previewDevice={previewDevice}
+          previewScale={previewScale}
+          streamedImage={streamedImage}
           selectedId={selectedId}
           onSelect={setSelectedId}
           onDropOnNode={handleDropOnNode}
