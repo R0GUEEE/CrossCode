@@ -69,6 +69,29 @@ function bytesToBase64(bytes: number[]): string {
   return btoa(binary);
 }
 
+type PreviewDiagnostic = {
+  file: string;
+  line: number;
+  column: number;
+  severity: "error" | "warning";
+  message: string;
+};
+
+function parsePreviewDiagnostics(output: string): PreviewDiagnostic[] {
+  const diagnostics: PreviewDiagnostic[] = [];
+  const pattern = /^(.+?):(\d+):(\d+):\s+(error|warning):\s+(.+)$/gm;
+  for (const match of output.matchAll(pattern)) {
+    diagnostics.push({
+      file: match[1].trim(),
+      line: Number(match[2]),
+      column: Number(match[3]),
+      severity: match[4] as PreviewDiagnostic["severity"],
+      message: match[5].trim(),
+    });
+  }
+  return diagnostics;
+}
+
 export interface UIBuilderProps {
   projectPath: string;
   /** The file the editor currently shows; the builder follows its package. */
@@ -539,8 +562,7 @@ const Inspector = ({
 // ------------------------------------------------------------------- main --
 
 export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderProps) => {
-  const { selectedToolchain } = useIDE();
-  const { selectedDevice, mountDdi } = useIDE();
+  const { selectedToolchain, devices, selectedDevice, setSelectedDevice, mountDdi } = useIDE();
   const [anisetteServer] = useStore<string>("apple-id/anisette-server", "ani.sidestore.io");
   const { runCommand, isRunningCommand } = useCommandRunner();
   const [doc, setDoc] = useState<UIDocument>(starterDocument);
@@ -942,6 +964,11 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
   const [previewScale, setPreviewScale] = useState(1);
   const [streamedImage, setStreamedImage] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
+  const [autoBuild, setAutoBuild] = useState(false);
+  const [previewStatus, setPreviewStatus] = useState<"idle" | "building" | "installing" | "ready" | "failed">("idle");
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewDiagnostics, setPreviewDiagnostics] = useState<PreviewDiagnostic[]>([]);
+  const lastAutoBuiltCode = useRef<string | null>(null);
 
   const capturePreview = useCallback(async () => {
     if (!selectedDevice) return;
@@ -966,6 +993,9 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
     if (!(await saveSwift())) return;
     if (!(await mountDdi(true))) return;
     try {
+      setPreviewError(null);
+      setPreviewDiagnostics([]);
+      setPreviewStatus("building");
       await runCommand("deploy_swift", {
         folder: projectPath,
         anisetteServer,
@@ -973,13 +1003,29 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
         toolchainPath: selectedToolchain.path,
         debug: true,
       });
+      setPreviewStatus("installing");
       await capturePreview();
       setStreaming(true);
+      setPreviewStatus("ready");
       addToast.success("Built, installed, and streaming preview.");
     } catch (error) {
+      setPreviewStatus("failed");
+      setPreviewError(String(error));
+      setPreviewDiagnostics(parsePreviewDiagnostics(String(error)));
+      setStreaming(false);
       addToast.error(`Preview deployment failed: ${error}`);
     }
   }, [addToast, anisetteServer, capturePreview, mountDdi, projectPath, runCommand, saveSwift, selectedDevice, selectedToolchain]);
+
+  useEffect(() => {
+    if (!autoBuild || !loaded || !selectedDevice || !selectedToolchain) return;
+    if (lastAutoBuiltCode.current === code) return;
+    const timer = window.setTimeout(() => {
+      lastAutoBuiltCode.current = code;
+      void buildAndStream();
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [autoBuild, buildAndStream, code, loaded, selectedDevice, selectedToolchain]);
 
   useEffect(() => {
     if (!streaming || !selectedDevice) return;
@@ -995,11 +1041,40 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
         <div className="uib-preview-controls" aria-label="SwiftUI live preview controls">
           <span className="uib-live-indicator" aria-hidden="true" />
           <Typography level="body-xs">Live Preview</Typography>
+          <span className={`uib-preview-status uib-preview-status-${previewStatus}`}>
+            {previewStatus === "idle" && "Idle"}
+            {previewStatus === "building" && "Building…"}
+            {previewStatus === "installing" && "Installing…"}
+            {previewStatus === "ready" && "Ready"}
+            {previewStatus === "failed" && "Failed"}
+          </span>
+          <Select
+            size="sm"
+            value={selectedDevice?.id.toString() ?? "none"}
+            onChange={(_event, value) => {
+              const device = devices.find((candidate) => candidate.id.toString() === value);
+              if (device) setSelectedDevice(device);
+            }}
+            aria-label="Preview device target"
+            disabled={devices.length === 0}
+          >
+            <Option value="none" disabled={devices.length === 0}>
+              {devices.length === 0 ? "No devices" : "Select device"}
+            </Option>
+            {devices.map((device) => (
+              <Option key={device.id} value={device.id.toString()}>
+                {device.name}
+              </Option>
+            ))}
+          </Select>
           <Button size="sm" variant={streaming ? "soft" : "plain"} disabled={!selectedDevice} onClick={() => setStreaming((value) => !value)}>
             {streaming ? "Streaming" : "Stream Device"}
           </Button>
           <Button size="sm" variant="soft" loading={isRunningCommand} disabled={!selectedDevice || isRunningCommand} onClick={() => void buildAndStream()}>
             Build & Stream
+          </Button>
+          <Button size="sm" variant={autoBuild ? "soft" : "plain"} disabled={!selectedDevice} onClick={() => setAutoBuild((value) => !value)}>
+            {autoBuild ? "Auto Build On" : "Auto Build"}
           </Button>
           <Select
             size="sm"
@@ -1153,6 +1228,30 @@ export default ({ projectPath, focusedFile, openNewFile, onClose }: UIBuilderPro
       </div>
 
       {packagesError && <div className="uib-package-error">{packagesError}</div>}
+      {previewError && (
+        <div className="uib-preview-error" role="alert">
+          <span>{previewError}</span>
+          <Button size="sm" variant="plain" onClick={() => void buildAndStream()}>
+            Retry
+          </Button>
+        </div>
+      )}
+      {previewDiagnostics.length > 0 && (
+        <div className="uib-diagnostics" role="list" aria-label="Build diagnostics">
+          {previewDiagnostics.map((diagnostic, index) => (
+            <button
+              key={`${diagnostic.file}:${diagnostic.line}:${diagnostic.column}:${index}`}
+              className={`uib-diagnostic uib-diagnostic-${diagnostic.severity}`}
+              onClick={() => openNewFile(diagnostic.file)}
+              title={`Open ${diagnostic.file} at line ${diagnostic.line}, column ${diagnostic.column}`}
+            >
+              <span className="uib-diagnostic-severity">{diagnostic.severity}</span>
+              <span>{diagnostic.message}</span>
+              <span className="uib-diagnostic-location">{diagnostic.file}:{diagnostic.line}:{diagnostic.column}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {importWarnings.length > 0 && (
         <div className="uib-import-warning">
           <span>

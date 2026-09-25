@@ -1,6 +1,6 @@
 import { path } from "@tauri-apps/api";
 import "./Editor.css";
-import { IconButton, useColorScheme } from "@mui/joy";
+import { IconButton, useColorScheme, Input, Typography } from "@mui/joy";
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import CloseIcon from "@mui/icons-material/Close";
 import CircleIcon from "@mui/icons-material/Circle";
@@ -108,6 +108,9 @@ export default ({
     [key: string]: [number, number];
   }>({});
   const [hoveredOnBtn, setHoveredOnBtn] = useState<number | null>(null);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickFilter, setQuickFilter] = useState("");
+  const [cursorPosition, setCursorPosition] = useState({ line: 1, column: 1 });
   const [formatOnSave] = useStore<boolean>("sourcekit/format", true);
 
   const { path: filePath } = useParams<"path">();
@@ -310,6 +313,30 @@ export default ({
   }, [mode, editor, initialized, openFiles]);
 
   useEffect(() => {
+    const handleQuickOpen = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setQuickOpen(true);
+        setQuickFilter("");
+      }
+      if (event.key === "Escape") setQuickOpen(false);
+    };
+    document.addEventListener("keydown", handleQuickOpen);
+    return () => document.removeEventListener("keydown", handleQuickOpen);
+  }, []);
+
+  useEffect(() => {
+    if (!editor) return;
+    const disposable = editor.onDidChangeCursorPosition((event) => {
+      setCursorPosition({
+        line: event.position.lineNumber,
+        column: event.position.column,
+      });
+    });
+    return () => disposable.dispose();
+  }, [editor]);
+
+  useEffect(() => {
     if (!monacoEl.current || !editor) return;
 
     const resizeObserver = new ResizeObserver(() => {
@@ -500,6 +527,48 @@ export default ({
 
   return (
     <div className={"editor"}>
+      {quickOpen && (
+        <div className="quick-open-backdrop" onClick={() => setQuickOpen(false)}>
+          <div className="quick-open" onClick={(event) => event.stopPropagation()}>
+            <Input
+              autoFocus
+              placeholder="Open file…"
+              value={quickFilter}
+              onChange={(event) => setQuickFilter(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setQuickOpen(false);
+                if (event.key === "Enter") {
+                  const match = tabs.find((tab) =>
+                    tab.name.toLowerCase().includes(quickFilter.toLowerCase())
+                  );
+                  if (match) {
+                    openNewFile(match.file);
+                    setQuickOpen(false);
+                  }
+                }
+              }}
+            />
+            <div className="quick-open-results">
+              {tabs
+                .filter((tab) => tab.name.toLowerCase().includes(quickFilter.toLowerCase()))
+                .map((tab) => (
+                  <button
+                    key={tab.file}
+                    onClick={() => {
+                      openNewFile(tab.file);
+                      setQuickOpen(false);
+                    }}
+                  >
+                    <span>{tab.name}</span>
+                    <small>{tab.file}</small>
+                  </button>
+                ))}
+              {tabs.length === 0 && <Typography level="body-sm">No open files</Typography>}
+            </div>
+            <div className="quick-open-hint">Ctrl/⌘ P to open · Esc to close</div>
+          </div>
+        </div>
+      )}
       <div
         className="tabsContainer MuiTabList-sizeSm"
         onDragOver={handleContainerDragOver}
@@ -573,6 +642,12 @@ export default ({
         ref={monacoEl}
         style={tabs.length >= 1 ? {} : { display: "none" }}
       />
+      <div className="editor-statusbar">
+        <span>{focused !== undefined && tabs[focused] ? tabs[focused].file : "No file open"}</span>
+        <span>Ln {cursorPosition.line}, Col {cursorPosition.column}</span>
+        <span>Swift</span>
+        <span>Ctrl/⌘ P Quick Open</span>
+      </div>
     </div>
   );
 };

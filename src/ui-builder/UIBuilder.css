@@ -40,6 +40,89 @@
   box-shadow: 0 0 0 3px rgba(53, 199, 89, 0.16);
 }
 
+.uib-preview-status {
+  font-size: 11px;
+  color: var(--joy-palette-neutral-500);
+}
+
+.uib-preview-status-ready {
+  color: #35c759;
+}
+
+.uib-preview-status-building,
+.uib-preview-status-installing {
+  color: #f5a623;
+}
+
+.uib-preview-status-failed {
+  color: #ff453a;
+}
+
+.uib-preview-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--padding-sm);
+  padding: 6px 10px;
+  color: #ffb4ab;
+  background: rgba(255, 69, 58, 0.12);
+  border: 1px solid rgba(255, 69, 58, 0.35);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.uib-diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0;
+}
+
+.uib-diagnostic {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 5px;
+  color: inherit;
+  background: rgba(255, 69, 58, 0.08);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.uib-diagnostic:hover {
+  background: rgba(255, 69, 58, 0.16);
+}
+
+.uib-diagnostic-warning {
+  background: rgba(245, 166, 35, 0.08);
+}
+
+.uib-diagnostic-warning:hover {
+  background: rgba(245, 166, 35, 0.16);
+}
+
+.uib-diagnostic-severity {
+  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 600;
+  color: #ff453a;
+}
+
+.uib-diagnostic-warning .uib-diagnostic-severity {
+  color: #f5a623;
+}
+
+.uib-diagnostic-location {
+  opacity: 0.65;
+  white-space: nowrap;
+}
+
 .uib-body {
   display: flex;
   flex: 1 1 0;
