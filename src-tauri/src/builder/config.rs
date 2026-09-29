@@ -132,6 +132,8 @@ impl ProjectInfo {
             capabilities.push("test".to_string());
         }
 
+        let build_type = project_kind_label(&kind).to_string();
+
         Ok(ProjectInfo {
             kind,
             root: root.to_string_lossy().to_string(),
@@ -141,7 +143,7 @@ impl ProjectInfo {
             targets,
             schemes,
             configurations: vec!["Debug".to_string(), "Release".to_string()],
-            build_type: project_kind_label(&kind).to_string(),
+            build_type,
             detected_files,
         })
     }
