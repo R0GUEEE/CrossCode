@@ -40,8 +40,28 @@ export function appendModifier(lines: string[], modifier: string): string[] {
   return [...lines, `${" ".repeat(pad)}${modifier}`];
 }
 
-/** Escape a Swift string literal body. */
-export function swiftString(value: string): string {
+/**
+ * Appends a block modifier — `head` is a modifier opening a closure
+ * (`.onTapGesture {`) and `body` its statements, which are indented one level
+ * deeper than the head:
+ *
+ *     Text("Hi")
+ *         .onTapGesture {
+ *             isTapped.toggle()
+ *         }
+ */
+export function appendBlock(lines: string[], head: string, body: string[]): string[] {
+  const withHead = appendModifier(lines, head);
+  const last = withHead[withHead.length - 1];
+  const indent = last.length - last.trimStart().length;
+  return [
+    ...withHead,
+    ...body.map((line) => (line.length === 0 ? line : " ".repeat(indent + INDENT.length) + line)),
+    `${" ".repeat(indent)}}`,
+  ];
+}
+
+/** Escape a Swift string literal body. */export function swiftString(value: string): string {
   const escaped = value
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')

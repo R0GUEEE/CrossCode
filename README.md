@@ -32,7 +32,7 @@ Check out the [Getting Started](https://github.com/nab138/CrossCode/wiki#getting
 
 - Generate a Darwin SDK for linux from a user provided copy of the latest Xcode (e.g. Xcode 27.0) to build the apps
 - Build apps using swift package manager
-- Visual SwiftUI builder: assemble views on a canvas, edit their properties, and generate the SwiftUI source
+- Visual SwiftUI builder: assemble views on a canvas, edit their properties, wire up tap actions, and generate the SwiftUI source
 - Import an existing Xcode project into a buildable CrossCode package
 - Log in with your Apple ID to sign apps
 - Install apps on device
@@ -68,6 +68,12 @@ the code editor:
 
 - drag components from the palette onto the canvas (or click to append them),
 - select a view to edit its properties, bindings and modifiers in the inspector,
+- give a view a **tap action**: a button runs its action in its own closure and
+  any other view gets an `.onTapGesture`. Pick what happens — flip a toggle,
+  add to or subtract from a number, assign a value, or dismiss the view — and
+  name the state variable it changes; the little preview in the inspector shows
+  the Swift that will be emitted, and `@State` (or `@Environment(\.dismiss)`) is
+  declared for you,
 - reorder, duplicate or delete views in the structure tree, and
 - watch the generated SwiftUI code update live.
 

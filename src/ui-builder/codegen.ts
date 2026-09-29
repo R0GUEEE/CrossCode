@@ -5,8 +5,10 @@
 // predictable and easy to diff.
 
 import { CATALOG, modifierLines, stateDeclarations } from "./catalog";
+import { tapGestureLines } from "./actions";
 import {
   INDENT,
+  appendBlock,
   appendModifier,
   indentLines,
   swiftIdentifier,
@@ -44,6 +46,12 @@ function renderNode(node: UINode): string[] {
 
   for (const modifier of modifierLines(node)) {
     lines = appendModifier(lines, modifier);
+  }
+  if (!spec.ownsAction) {
+    const gesture = tapGestureLines(node);
+    if (gesture) {
+      lines = appendBlock(lines, gesture.head, gesture.body);
+    }
   }
   return lines;
 }

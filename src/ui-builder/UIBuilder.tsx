@@ -14,8 +14,16 @@ import {
   boxCss,
   defaultsFor,
   fieldsOf,
+  stateNames,
 } from "./catalog";
 import type { PropField } from "./catalog";
+import {
+  ACTION_OPTIONS,
+  actionStatements,
+  needsTarget,
+  needsValue,
+} from "./actions";
+import type { ActionKind } from "./actions";
 import { generateSwift } from "./codegen";
 import { str, swiftIdentifier } from "./format";
 import { parseSwiftDocument } from "./parse";
@@ -284,6 +292,11 @@ const NodeView = ({ node: current, selectedId, onSelect, onDropOnNode }: NodeVie
       onDrop={(event) => onDropOnNode(event, current)}
     >
       <span className="uib-node-tag">{spec.label}</span>
+      {actionStatements(current).length > 0 && (
+        <span className="uib-node-action" title="This view has a tap action">
+          tap
+        </span>
+      )}
       {spec.preview(current, children)}
     </div>
   );
@@ -405,6 +418,78 @@ const TreeView = ({
 );
 
 // ------------------------------------------------------------- inspector --
+
+/**
+ * Editor for a node's tap action. It writes three props (`action`,
+ * `actionTarget`, `actionValue`) and previews the statement the generator will
+ * emit, so the effect of the choice is visible without regenerating the file.
+ */
+const ActionEditor = ({
+  node: selected,
+  suggestions,
+  onPropChange,
+}: {
+  node: UINode;
+  suggestions: string[];
+  onPropChange: (id: string, key: string, value: string | number | boolean) => void;
+}) => {
+  const raw = str(selected.props.action);
+  const kind = (ACTION_OPTIONS.some((option) => option.value === raw) ? raw : "none") as ActionKind;
+  const statements = actionStatements(selected);
+  const incomplete = statements.some((statement) => statement.startsWith("//"));
+
+  return (
+    <div className="uib-field">
+      <label>Tap Action</label>
+      <select
+        value={kind}
+        onChange={(event) => onPropChange(selected.id, "action", event.target.value)}
+      >
+        {ACTION_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {needsTarget(kind) && (
+        <input
+          type="text"
+          list="uib-state-name-options"
+          value={str(selected.props.actionTarget)}
+          placeholder={kind === "toggle" ? "isEnabled" : "count"}
+          onChange={(event) => onPropChange(selected.id, "actionTarget", event.target.value)}
+        />
+      )}
+      {needsValue(kind) && (
+        <input
+          type="text"
+          value={str(selected.props.actionValue)}
+          placeholder={'"Alex", 42 or true'}
+          onChange={(event) => onPropChange(selected.id, "actionValue", event.target.value)}
+        />
+      )}
+      {kind !== "none" && (
+        <div className={`uib-code-hint${incomplete ? " uib-hint-warn" : ""}`}>
+          {statements.join("\n")}
+        </div>
+      )}
+      {needsTarget(kind) && (
+        <div className="uib-hint">
+          {kind === "set"
+            ? "Variables are declared for you; the value may be a number, true/false or text."
+            : "Name of the @State variable this changes; it is declared for you."}
+        </div>
+      )}
+      {suggestions.length > 0 && (
+        <datalist id="uib-state-name-options">
+          {suggestions.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
+      )}
+    </div>
+  );
+};
 
 const FieldEditor = ({
   field,
@@ -546,14 +631,23 @@ const Inspector = ({
               </Button>
             )}
           </div>
-          {fieldsOf(selected).map((field) => (
-            <FieldEditor
-              key={field.key}
-              field={field}
-              value={selected.props[field.key]}
-              onChange={(value) => onPropChange(selected.id, field.key, value)}
-            />
-          ))}
+          {fieldsOf(selected).map((field) =>
+            field.type === "action" ? (
+              <ActionEditor
+                key={field.key}
+                node={selected}
+                suggestions={stateNames(doc.root)}
+                onPropChange={onPropChange}
+              />
+            ) : (
+              <FieldEditor
+                key={field.key}
+                field={field}
+                value={selected.props[field.key]}
+                onChange={(value) => onPropChange(selected.id, field.key, value)}
+              />
+            )
+          )}
         </div>
       ) : (
         <div className="uib-section uib-hint">

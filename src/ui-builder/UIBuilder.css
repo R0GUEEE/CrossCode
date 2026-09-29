@@ -351,6 +351,21 @@
   display: block;
 }
 
+/* Marker on views that carry a tap action, so the canvas shows what is wired up. */
+.uib-node-action {
+  position: absolute;
+  top: -9px;
+  right: 2px;
+  font-size: 9px;
+  line-height: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--joy-palette-warning-500, #f0a020);
+  color: #16160f;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 .uib-node-unknown {
   padding: 4px 8px;
   font-size: 11px;
@@ -415,6 +430,19 @@
 .uib-hint-warn {
   color: var(--joy-palette-danger-500);
   opacity: 1;
+}
+
+/* Preview of the Swift the action will generate. */
+.uib-code-hint {
+  grid-column: 1 / -1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: rgba(127, 127, 127, 0.12);
+  opacity: 0.85;
 }
 
 .uib-node-actions {

@@ -21,7 +21,18 @@ import {
   swiftNumber,
   swiftString,
 } from "./format";
+import { walk } from "./types";
 import type { Props, UINode } from "./types";
+import { STATE_DEFAULTS, type StateValueType } from "./state";
+import {
+  DISMISS_DECLARATION,
+  actionStateDeclarations,
+  actionStatements,
+  usesDismiss,
+} from "./actions";
+
+export { STATE_DEFAULTS };
+export type { StateValueType };
 
 export type Category = "Layout" | "Text" | "Controls" | "Media" | "Other";
 
@@ -33,22 +44,13 @@ export const CATEGORY_ORDER: Category[] = [
   "Other",
 ];
 
-export type StateValueType = "Bool" | "String" | "Double" | "Int" | "Date";
-
-export const STATE_DEFAULTS: Record<StateValueType, string> = {
-  Bool: "false",
-  String: '""',
-  Double: "0",
-  Int: "0",
-  Date: "Date()",
-};
-
 export type PropField =
   | { key: string; label: string; type: "string"; placeholder?: string }
   | { key: string; label: string; type: "number"; placeholder?: string }
   | { key: string; label: string; type: "bool" }
   | { key: string; label: string; type: "enum"; options: string[] }
-  | { key: string; label: string; type: "state"; valueType: StateValueType };
+  | { key: string; label: string; type: "state"; valueType: StateValueType }
+  | { key: string; label: string; type: "action" };
 
 export type Spec = {
   kind: string;
@@ -66,9 +68,23 @@ export type Spec = {
    * for Swift reasons (e.g. `NavigationStack` + `navigationTitle`).
    */
   childModifiers?: (children: string[][], node: UINode) => string[][];
+  /**
+   * The spec renders the tap action itself (a Button puts it in its own
+   * trailing closure), so the generator must not add an `.onTapGesture`.
+   */
+  ownsAction?: boolean;
 };
 
 // ---------------------------------------------------------------- modifiers --
+
+/**
+ * The inspector field for a node's tap action. Buttons list it in their own
+ * `fields`; every other spec gets it from `fieldsOf`, because the action is
+ * rendered as an `.onTapGesture` on that view.
+ */
+export const ACTION_FIELDS: PropField[] = [
+  { key: "action", label: "Tap Action", type: "action" },
+];
 
 export const MODIFIER_FIELDS: PropField[] = [
   {
@@ -126,8 +142,7 @@ export const MODIFIER_FIELDS: PropField[] = [
   { key: "opacity", label: "Opacity", type: "number", placeholder: "0.5" },
 ];
 
-/** Swift modifier chain for a node, in a stable order. */
-export function modifierLines(node: UINode): string[] {
+/** Swift modifier chain for a node, in a stable order. */export function modifierLines(node: UINode): string[] {
   const lines: string[] = [];
   const font = str(node.props.font);
   if (font) lines.push(`.font(${font.startsWith(".") ? font : `.${font}`})`);
@@ -166,9 +181,14 @@ export function modifierLines(node: UINode): string[] {
   return lines;
 }
 
-/** `@State` declarations required by every bound control in the tree. */
+/**
+ * Stored-property declarations required by the tree: the `@State` variables of
+ * every bound control, the ones the tap actions change, and the `dismiss`
+ * environment a "Dismiss this view" action needs.
+ */
 export function stateDeclarations(root: UINode): string[] {
   const seen = new Map<string, StateValueType>();
+  let needsDismiss = false;
   const visit = (node: UINode) => {
     const spec = CATALOG[node.kind];
     if (spec) {
@@ -178,15 +198,38 @@ export function stateDeclarations(root: UINode): string[] {
         if (name && !seen.has(name)) seen.set(name, field.valueType);
       }
     }
+    for (const declaration of actionStateDeclarations(node)) {
+      if (!seen.has(declaration.name)) seen.set(declaration.name, declaration.type);
+    }
+    if (usesDismiss(node)) needsDismiss = true;
     node.children.forEach(visit);
   };
   visit(root);
 
-  return [...seen.entries()].map(([name, valueType]) => {
+  const declarations = [...seen.entries()].map(([name, valueType]) => {
     const value = STATE_DEFAULTS[valueType];
     const type = valueType === "Bool" ? "" : `: ${valueType}`;
     return `@State private var ${name}${type} = ${value}`;
   });
+  if (needsDismiss) declarations.push(DISMISS_DECLARATION);
+  return declarations;
+}
+
+/** Every state variable name used in the tree, for the inspector's suggestions. */
+export function stateNames(root: UINode): string[] {
+  const names = new Set<string>();
+  for (const node of walk(root)) {
+    const spec = CATALOG[node.kind];
+    if (spec) {
+      for (const field of spec.fields) {
+        if (field.type !== "state") continue;
+        const name = swiftIdentifier(str(node.props[field.key]));
+        if (name) names.add(name);
+      }
+    }
+    for (const declaration of actionStateDeclarations(node)) names.add(declaration.name);
+  }
+  return [...names];
 }
 
 // ----------------------------------------------------------- preview styles --
@@ -647,7 +690,8 @@ const CATALOG_LIST: Spec[] = [
     category: "Controls",
     container: false,
     summary: "Tappable button",
-    defaults: { title: "Continue", systemImage: "", style: "" },
+    ownsAction: true,
+    defaults: { title: "Continue", systemImage: "", style: "", action: "none" },
     fields: [
       { key: "title", label: "Title", type: "string", placeholder: "Continue" },
       { key: "systemImage", label: "SF Symbol", type: "string", placeholder: "(optional)" },
@@ -657,19 +701,25 @@ const CATALOG_LIST: Spec[] = [
         type: "enum",
         options: ["", "bordered", "borderedProminent", "plain"],
       },
+      ...ACTION_FIELDS,
     ],
     swift: (node) => {
       const title = str(node.props.title) || "Button";
       const symbol = str(node.props.systemImage);
+      const statements = actionStatements(node);
+      const body = indentLines(
+        statements.length > 0 ? statements : ["// TODO: handle tap"],
+        1
+      );
       const lines = symbol
         ? [
             "Button {",
-            `${INDENT}// TODO: handle tap`,
+            ...body,
             "} label: {",
             `${INDENT}Label(${swiftString(title)}, systemImage: ${swiftString(symbol)})`,
             "}",
           ]
-        : [`Button(${swiftString(title)}) {`, `${INDENT}// TODO: handle tap`, "}"];
+        : [`Button(${swiftString(title)}) {`, ...body, "}"];
       const style = str(node.props.style);
       // a trailing-closure block keeps its modifiers aligned with the block
       return style ? appendModifier(lines, `.buttonStyle(.${style})`) : lines;
@@ -1065,7 +1115,9 @@ export const PALETTE: Spec[] = CATALOG_LIST;
 export function fieldsOf(node: UINode): PropField[] {
   const spec = CATALOG[node.kind];
   if (!spec) return [];
-  return [...spec.fields, ...MODIFIER_FIELDS];
+  // Buttons already list ACTION_FIELDS: they render the action themselves.
+  const actionFields = spec.ownsAction ? [] : ACTION_FIELDS;
+  return [...spec.fields, ...actionFields, ...MODIFIER_FIELDS];
 }
 
 /** A fresh node of `kind`, including its default props. */

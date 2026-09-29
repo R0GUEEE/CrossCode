@@ -164,4 +164,69 @@ struct ContentView: View {
       expect(source).not.toContain("Unsupported component");
     }
   });
+
+  test("runs a button's tap action in its own closure", () => {
+    const source = generateSwift(
+      doc(node("Button", { title: "Add", action: "increment", actionTarget: "count" }))
+    );
+
+    expect(source).toBe(
+      `import SwiftUI
+
+struct ContentView: View {
+    @State private var count: Int = 0
+
+    var body: some View {
+        Button("Add") {
+            count += 1
+        }
+    }
+}
+`
+    );
+  });
+
+  test("gives views that are not buttons an onTapGesture", () => {
+    const source = generateSwift(
+      doc(node("Text", { text: "Tap me", padding: "8", action: "toggle", actionTarget: "isOn" }))
+    );
+
+    expect(source).toContain(
+      `Text("Tap me")
+            .padding(8)
+            .onTapGesture {
+                isOn.toggle()
+            }`
+    );
+    expect(source).toContain("@State private var isOn = false");
+  });
+
+  test("declares the environment value a dismiss action needs", () => {
+    const source = generateSwift(
+      doc(
+        node("VStack", {}, [
+          node("Button", { title: "Done", action: "dismiss" }),
+          node("Button", { title: "Rename", action: "set", actionTarget: "name", actionValue: "Alex" }),
+        ])
+      )
+    );
+
+    expect(source).toContain("@Environment(\\.dismiss) private var dismiss");
+    expect(source).toContain('@State private var name: String = ""');
+    expect(source).toContain('name = "Alex"');
+    expect(source).toContain("dismiss()");
+  });
+
+  test("declares a state variable once when a binding and an action share it", () => {
+    const source = generateSwift(
+      doc(
+        node("VStack", {}, [
+          node("Toggle", { title: "On", isOn: "isOn" }),
+          node("Button", { title: "Flip", action: "toggle", actionTarget: "isOn" }),
+        ])
+      )
+    );
+
+    expect(source.split("@State private var isOn").length).toBe(2);
+  });
 });
