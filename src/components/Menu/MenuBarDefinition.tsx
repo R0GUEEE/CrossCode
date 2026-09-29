@@ -21,13 +21,11 @@ export default [
       {
         label: "New",
         items: [
-          // {
-          //   name: "New File...",
-          //   shortcut: "Ctrl+N",
-          //   callback: () => {
-          //     alert("Not implemented yet :(");
-          //   },
-          // },
+          {
+            name: "New File...",
+            shortcut: "Ctrl+N",
+            callbackName: "newFile",
+          },
           {
             name: "New Project...",
             callbackName: "newProject",
@@ -63,9 +61,7 @@ export default [
           {
             name: "Save As...",
             shortcut: "Ctrl+Shift+S",
-            callback: () => {
-              alert("Not implemented yet :(");
-            },
+            callbackName: "saveAs",
           },
         ],
       },

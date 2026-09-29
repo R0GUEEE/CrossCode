@@ -57,7 +57,7 @@ jobs:
       - name: Install frontend dependencies
         run: bun i --frozen-lockfile
 
-      - name: Frontend unit tests (UI builder, Xcode importer)
+      - name: Frontend unit tests (UI builder, Xcode importer, file system)
         run: bun test src
 
       - name: Clean old bundles

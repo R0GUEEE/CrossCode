@@ -216,7 +216,20 @@ export default ({ openFolder, setOpenFile, openInUIBuilder, collapsed = false, o
     if (!renameTarget) return;
     const parent = await path.dirname(renameTarget);
     const newPath = await path.resolve(parent, renameValue);
-    await fs.rename(renameTarget, newPath);
+    if (newPath === renameTarget) {
+      setRenameOpen(false);
+      return;
+    }
+    if (await fs.exists(newPath)) {
+      addToast.error("A file or folder with that name already exists!");
+      return;
+    }
+    try {
+      await fs.rename(renameTarget, newPath);
+    } catch (error) {
+      addToast.error(`Could not rename: ${error}`);
+      return;
+    }
     setRenameOpen(false);
     setRenameTarget(null);
     setRenameValue("");
@@ -225,7 +238,12 @@ export default ({ openFolder, setOpenFile, openInUIBuilder, collapsed = false, o
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    await fs.remove(deleteTarget, { recursive: true });
+    try {
+      await fs.remove(deleteTarget, { recursive: true });
+    } catch (error) {
+      addToast.error(`Could not delete: ${error}`);
+      return;
+    }
     setDeleteOpen(false);
     setDeleteTarget(null);
     setRefresh((r) => r + 1);
@@ -238,7 +256,12 @@ export default ({ openFolder, setOpenFile, openInUIBuilder, collapsed = false, o
       addToast.error("File already exists!");
       return;
     }
-    await fs.writeTextFile(newPath, "");
+    try {
+      await fs.writeTextFile(newPath, "");
+    } catch (error) {
+      addToast.error(`Could not create the file: ${error}`);
+      return;
+    }
     setNewOpen(false);
     setNewTarget(null);
     setNewValue("");
@@ -252,7 +275,12 @@ export default ({ openFolder, setOpenFile, openInUIBuilder, collapsed = false, o
       addToast.error("Folder already exists!");
       return;
     }
-    await fs.mkdir(newPath);
+    try {
+      await fs.mkdir(newPath);
+    } catch (error) {
+      addToast.error(`Could not create the folder: ${error}`);
+      return;
+    }
     setNewFolderOpen(false);
     setNewFolderTarget(null);
     setNewFolderValue("");
@@ -438,33 +466,6 @@ export default ({ openFolder, setOpenFile, openInUIBuilder, collapsed = false, o
             <Button onClick={() => setNewFolderOpen(false)}>Cancel</Button>
             <Button onClick={handleNewFolder} disabled={!newFolderValue.trim()}>
               Create
-            </Button>
-          </Box>
-        </ModalDialog>
-      </Modal>
-
-      {/* Rename Modal */}
-      <Modal open={renameOpen} onClose={() => setRenameOpen(false)}>
-        <ModalDialog>
-          <Typography level="h4" component="h2" sx={{ mb: 2 }}>
-            Rename
-          </Typography>
-          <Input
-            autoFocus
-            value={renameValue}
-            onChange={(e) => setRenameValue(e.target.value)}
-            onKeyDown={async (e) => {
-              if (e.key === "Enter") {
-                await handleRename();
-              }
-            }}
-          />
-          <Box
-            sx={{ display: "flex", gap: 1, justifyContent: "flex-end", mt: 2 }}
-          >
-            <Button onClick={() => setRenameOpen(false)}>Cancel</Button>
-            <Button onClick={handleRename} disabled={!renameValue.trim()}>
-              Rename
             </Button>
           </Box>
         </ModalDialog>

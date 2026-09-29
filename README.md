@@ -38,6 +38,7 @@ Check out the [Getting Started](https://github.com/nab138/CrossCode/wiki#getting
 - Install apps on device
 - Create projects from templates
 - Code editing including error reporting, autocomplete, go to definition, and other language features
+- Manage the project from the explorer (new file/folder, rename, delete) and with `File -> New File...` / `File -> Save As...`
 - Light/dark mode and other customizations
 - View and manage certificates, app IDs, and more
 - View the syslog or the stdout (console) of your device/app
@@ -78,6 +79,18 @@ Slider, ...) declare their `@State` variables automatically.
 
 The canvas is a preview approximation, not a simulator; build the app to see
 the real thing on a device.
+
+## Files and editing
+
+The project explorer shows the folder you opened. Right click an entry to
+create a file or folder inside it, rename it, delete it, reveal it in the file
+manager or open it in the UI Builder. `File -> New File...` (Ctrl+N) asks for a
+path inside the project and opens the result; `File -> Save As...`
+(Ctrl+Shift+S) writes a copy of the file in the editor and switches to it.
+
+The editor is a full Monaco workbench wired to the same files through a custom
+file system provider, so creating, renaming and deleting folders works from
+both sides and the editor is told about changes made outside the app.
 
 ## Importing an Xcode project
 

@@ -6,6 +6,8 @@ import { URI } from "@codingame/monaco-vscode-api/vscode/vs/base/common/uri";
 import {
   FileChangeType,
   FileSystemProviderCapabilities,
+  FileSystemProviderError,
+  FileSystemProviderErrorCode,
   FileType,
   IFileChange,
   IFileDeleteOptions,
@@ -22,23 +24,72 @@ import {
 import * as fs from "@tauri-apps/plugin-fs";
 import { invoke } from "@tauri-apps/api/core";
 import { platform } from "@tauri-apps/plugin-os";
+import {
+  classifyWatchEvent,
+  isExcludedPath,
+  providerErrorCodeFor,
+  ProviderErrorCodeName,
+  WatchChangeKind,
+} from "./fs-provider-helpers";
+
+const errorCodes: Record<ProviderErrorCodeName, FileSystemProviderErrorCode> = {
+  FileExists: FileSystemProviderErrorCode.FileExists,
+  FileNotFound: FileSystemProviderErrorCode.FileNotFound,
+  FileNotADirectory: FileSystemProviderErrorCode.FileNotADirectory,
+  FileIsADirectory: FileSystemProviderErrorCode.FileIsADirectory,
+  NoPermissions: FileSystemProviderErrorCode.NoPermissions,
+  FileExceedsStorageQuota: FileSystemProviderErrorCode.FileExceedsStorageQuota,
+  FileTooLarge: FileSystemProviderErrorCode.FileTooLarge,
+  Unknown: FileSystemProviderErrorCode.Unknown,
+};
+
+const changeTypes: Record<WatchChangeKind, FileChangeType> = {
+  added: FileChangeType.ADDED,
+  updated: FileChangeType.UPDATED,
+  deleted: FileChangeType.DELETED,
+};
+
+/**
+ * The fs plugin rejects with a plain string (and occasionally an `Error`), while
+ * the file service wants an error carrying a `FileSystemProviderErrorCode` — the
+ * code decides the message the user sees and how the operation is treated.
+ */
+function toProviderError(error: unknown): Error {
+  if (error instanceof FileSystemProviderError) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  return FileSystemProviderError.create(
+    message,
+    errorCodes[providerErrorCodeFor(message)]
+  );
+}
+
+function toFileType(entry: fs.DirEntry): FileType {
+  let type = FileType.Unknown;
+  if (entry.isFile) type |= FileType.File;
+  if (entry.isDirectory) type |= FileType.Directory;
+  if (entry.isSymlink) type |= FileType.SymbolicLink;
+  return type;
+}
 
 export default class TauriFileSystemProvider
   extends Disposable
   implements IFileSystemProviderWithFileReadWriteCapability
 {
   private _onDidChangeFile: Emitter<readonly IFileChange[]>;
+  private _onDidWatchError: Emitter<string>;
 
   capabilities: FileSystemProviderCapabilities;
   onDidChangeCapabilities: Event<void>;
   onDidChangeFile: Event<readonly IFileChange[]>;
-  onDidWatchError?: Event<string> | undefined;
+  onDidWatchError: Event<string>;
 
   constructor(readonly: boolean) {
     super();
     this.onDidChangeCapabilities = Event.None;
     this._onDidChangeFile = new Emitter();
     this.onDidChangeFile = this._onDidChangeFile.event;
+    this._onDidWatchError = new Emitter();
+    this.onDidWatchError = this._onDidWatchError.event;
     this.capabilities =
       FileSystemProviderCapabilities.FileReadWrite |
       FileSystemProviderCapabilities.PathCaseSensitive;
@@ -46,101 +97,195 @@ export default class TauriFileSystemProvider
       this.capabilities |= FileSystemProviderCapabilities.Readonly;
     }
   }
-  async readFile(resource: URI): Promise<Uint8Array> {
-    return await fs.readFile(await this.path(resource));
+
+  override dispose(): void {
+    this._onDidChangeFile.dispose();
+    this._onDidWatchError.dispose();
+    super.dispose();
   }
+
+  async readFile(resource: URI): Promise<Uint8Array> {
+    return await this.withPath(resource, (path) => fs.readFile(path));
+  }
+
   async writeFile(resource: URI, content: Uint8Array, opts: IFileWriteOptions) {
-    await fs.writeFile(await this.path(resource), content, {
-      create: opts.create,
-      createNew: !opts.overwrite,
-    });
+    const existed = await this.withPath(resource, (path) => fs.exists(path));
+    if (!opts.overwrite && existed) {
+      throw FileSystemProviderError.create(
+        `Unable to write file '${resource.toString()}' (File exists)`,
+        FileSystemProviderErrorCode.FileExists
+      );
+    }
+    if (!opts.create && !existed) {
+      throw FileSystemProviderError.create(
+        `Unable to write file '${resource.toString()}' (File not found)`,
+        FileSystemProviderErrorCode.FileNotFound
+      );
+    }
+    await this.withPath(resource, (path) =>
+      fs.writeFile(path, content, { create: true })
+    );
     this._onDidChangeFile.fire([
       {
-        type: opts.create ? FileChangeType.ADDED : FileChangeType.UPDATED,
+        type: existed ? FileChangeType.UPDATED : FileChangeType.ADDED,
         resource,
       },
     ]);
   }
 
   async stat(resource: URI): Promise<IStat> {
-    let stat = await fs.stat(await this.path(resource));
-    let type = stat.isFile ? FileType.File : FileType.Directory;
-    if (stat.isSymlink) {
-      type = FileType.SymbolicLink;
-    }
-    let ctime = stat.birthtime?.getMilliseconds() || 0;
-    let mtime = stat.mtime?.getMilliseconds() || 0;
+    const stat = await this.withPath(resource, (path) => fs.stat(path));
+    // `FileType` is a bitfield: a symlink to a folder is both.
+    let type = FileType.Unknown;
+    if (stat.isFile) type |= FileType.File;
+    if (stat.isDirectory) type |= FileType.Directory;
+    if (stat.isSymlink) type |= FileType.SymbolicLink;
+    // The file service expects milliseconds since the epoch — not the
+    // millisecond *component* of the date, which is what this used to report.
+    const mtime = stat.mtime ? stat.mtime.getTime() : 0;
+    const birthtime = stat.birthtime ? stat.birthtime.getTime() : 0;
     return {
       type,
-      ctime,
-      mtime,
+      ctime: Number.isFinite(birthtime) && birthtime > 0 ? birthtime : mtime,
+      mtime: Number.isFinite(mtime) ? mtime : 0,
       size: stat.size,
     };
   }
 
+  async readdir(resource: URI): Promise<[string, FileType][]> {
+    const entries = await this.withPath(resource, (path) => fs.readDir(path));
+    return entries.map((entry) => [entry.name, toFileType(entry)]);
+  }
+
+  async mkdir(resource: URI): Promise<void> {
+    // The file service creates the parents itself (`mkdirp`), so `recursive`
+    // only makes this tolerant of a folder that appeared in the meantime.
+    await this.withPath(resource, (path) => fs.mkdir(path, { recursive: true }));
+    this._onDidChangeFile.fire([{ type: FileChangeType.ADDED, resource }]);
+  }
+
+  async delete(resource: URI, opts: IFileDeleteOptions): Promise<void> {
+    await this.withPath(resource, (path) =>
+      fs.remove(path, { recursive: opts.recursive })
+    );
+    this._onDidChangeFile.fire([{ type: FileChangeType.DELETED, resource }]);
+  }
+
+  async rename(from: URI, to: URI, opts: IFileOverwriteOptions): Promise<void> {
+    const exists = await this.withPath(to, (path) => fs.exists(path));
+    if (!opts.overwrite && exists) {
+      throw FileSystemProviderError.create(
+        `Unable to rename '${from.toString()}' to '${to.toString()}' (File exists)`,
+        FileSystemProviderErrorCode.FileExists
+      );
+    }
+    const source = await this.path(from);
+    const target = await this.path(to);
+    try {
+      await fs.rename(source, target);
+    } catch (error) {
+      throw toProviderError(error);
+    }
+    this._onDidChangeFile.fire([
+      { type: FileChangeType.DELETED, resource: from },
+      { type: FileChangeType.ADDED, resource: to },
+    ]);
+  }
+
   watch(resource: URI, opts: IWatchOptions): IDisposable {
     let disposed = false;
+    let unwatch: fs.UnwatchFn | undefined;
+
+    const fire = (changes: IFileChange[]) => {
+      if (!disposed && changes.length) {
+        this._onDidChangeFile.fire(changes);
+      }
+    };
+
     (async () => {
-      fs.watchImmediate(
-        await this.path(resource),
-        () => {
-          if (!disposed) {
-            // TODO: Exclude files based on opts.excludes and look into how recursive watch actually works
-            this._onDidChangeFile.fire([
-              {
-                type: FileChangeType.UPDATED,
-                resource,
-              },
-            ]);
-          }
-        },
-        {
-          recursive: opts.recursive,
-        }
-      ).then((unwatch) => {
+      try {
+        const watchedPath = await this.path(resource);
+        const stop = await fs.watchImmediate(
+          watchedPath,
+          (event) => {
+            const kind = classifyWatchEvent(event.type);
+            if (!kind) return;
+            const paths = (event.paths ?? []).filter(
+              (path) => !isExcludedPath(path, watchedPath, opts.excludes)
+            );
+            // Some backends report an event without the path it belongs to;
+            // fall back to the watched resource so the change is not lost.
+            if (paths.length === 0) {
+              fire([{ type: changeTypes[kind], resource }]);
+              return;
+            }
+            void (async () => {
+              const changes: IFileChange[] = [];
+              for (const path of paths) {
+                changes.push({
+                  type: changeTypes[kind],
+                  resource: await this.uriFor(path),
+                });
+              }
+              fire(changes);
+            })();
+          },
+          { recursive: opts.recursive }
+        );
         if (disposed) {
-          unwatch();
+          stop();
+        } else {
+          unwatch = stop;
         }
-        (disposable as any)._unwatch = unwatch;
-      });
+      } catch (error) {
+        this._onDidWatchError.fire(
+          `Unable to watch ${resource.toString()}: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
     })();
 
-    const disposable: IDisposable = {
+    return {
       dispose: () => {
         disposed = true;
-        if ((disposable as any)._unwatch) {
-          (disposable as any)._unwatch();
-        }
+        unwatch?.();
+        unwatch = undefined;
       },
     };
-    return disposable;
   }
 
-  // TODO: Implement remaining methods
-  // @ts-ignore
-  mkdir(resource: URI): Promise<void> {
-    throw new Error("Mkdir not implemented.");
+  /** Runs `operation` against the plugin's path form of `resource`. */
+  private async withPath<T>(
+    resource: URI,
+    operation: (path: string) => Promise<T>
+  ): Promise<T> {
+    try {
+      return await operation(await this.path(resource));
+    } catch (error) {
+      throw toProviderError(error);
+    }
   }
 
-  // @ts-ignore
-  readdir(resource: URI): Promise<[string, FileType][]> {
-    throw new Error("Readdir not implemented.");
-  }
-
-  // @ts-ignore
-  delete(resource: URI, opts: IFileDeleteOptions): Promise<void> {
-    throw new Error("Delete not implemented.");
-  }
-
-  // @ts-ignore
-  rename(from: URI, to: URI, opts: IFileOverwriteOptions): Promise<void> {
-    throw new Error("Rename not implemented.");
-  }
-
+  /**
+   * Path of a resource in the form the fs plugin understands: the internal
+   * (Linux/WSL) path, converted when running on Windows.
+   */
   private async path(resource: URI): Promise<string> {
     if (platform() === "windows") {
       return await invoke<string>("windows_path", { path: resource.path });
     }
     return resource.fsPath;
+  }
+
+  /**
+   * Inverse of {@link path}: watcher events come back in the plugin's own path
+   * form, so convert before building a resource out of them.
+   */
+  private async uriFor(path: string): Promise<URI> {
+    if (platform() === "windows") {
+      return URI.file(await invoke<string>("linux_path", { path }));
+    }
+    return URI.file(path);
   }
 }

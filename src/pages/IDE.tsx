@@ -30,8 +30,9 @@ import BottomBar from "../components/Tiles/BottomBar";
 import { open as openFileDialog, save } from "@tauri-apps/plugin-dialog";
 import { IStandaloneCodeEditor } from "@codingame/monaco-vscode-api/vscode/vs/editor/standalone/browser/standaloneCodeEditor";
 import { MIN_DARWIN_SDK_VERSION, isSupportedSDKVersion } from "../utilities/constants";
-import { writeFile } from "@tauri-apps/plugin-fs";
-import { readTextFile } from "@tauri-apps/plugin-fs";
+import { exists, readTextFile, writeFile, writeTextFile } from "@tauri-apps/plugin-fs";
+import { basename, join } from "@tauri-apps/api/path";
+import { platform } from "@tauri-apps/plugin-os";
 import UIBuilder from "../ui-builder/UIBuilder";
 import {
   asArray,
@@ -99,6 +100,14 @@ async function loadWorkspaceTargets(info: ProjectInfo): Promise<WorkspaceTarget[
 }
 
 let autoStartedLsp = "";
+
+/** Path in the form the editor and the LSP use, from the one dialogs return. */
+async function toInternalPath(pluginPath: string): Promise<string> {
+  if (platform() === "windows") {
+    return await invoke<string>("linux_path", { path: pluginPath });
+  }
+  return pluginPath;
+}
 
 export default () => {
   const { storeInitialized, store } = useContext(StoreContext);
@@ -291,9 +300,58 @@ export default () => {
     }
   }, [openNewFile]);
 
+  /** `File -> New -> New File...`: ask for a path inside the workspace and open it. */
+  const createFile = useCallback(async () => {
+    const target = await save({
+      title: "New File",
+      defaultPath: await join(path, "untitled.swift"),
+    });
+    if (!target) return;
+    try {
+      if (await exists(target)) {
+        addToast.error("A file with that name already exists.");
+        return;
+      }
+      await writeTextFile(target, "");
+    } catch (error) {
+      addToast.error(`Could not create the file: ${error}`);
+      return;
+    }
+    openNewFile(await toInternalPath(target));
+  }, [path, openNewFile, addToast]);
+
+  /**
+   * `File -> Save -> Save As...`: write a copy of the open file next to the
+   * workspace root and switch to it. The original tab keeps its contents.
+   */
+  const saveAsFile = useCallback(async () => {
+    if (!editor || !openFile) {
+      addToast.error("Open a file in the editor before saving a copy.");
+      return;
+    }
+    const target = await save({
+      title: "Save As",
+      defaultPath: await join(path, await basename(openFile)),
+    });
+    if (!target) return;
+    try {
+      await writeTextFile(target, editor.getValue());
+    } catch (error) {
+      addToast.error(`Could not save the file: ${error}`);
+      return;
+    }
+    const file = await toInternalPath(target);
+    if (file !== openFile) {
+      openNewFile(file);
+    }
+    addToast.success(`Saved a copy to ${file}`);
+  }, [path, editor, openFile, openNewFile, addToast]);
+
   useEffect(() => {
     setCallbacks({
       save: saveFile ?? (async () => {}),
+      saveAs: saveAsFile,
+      newFile: createFile,
       openFolderDialog,
       newProject: () => navigate("/new"),
       welcomePage: () => navigate("/"),
@@ -305,6 +363,8 @@ export default () => {
     });
   }, [
     saveFile,
+    saveAsFile,
+    createFile,
     openFolderDialog,
     navigate,
     selectFile,
