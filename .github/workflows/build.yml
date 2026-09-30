@@ -84,7 +84,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: ${{ github.event_name == 'release' && '--bundles msi,nsis' || '--bundles nsis' }}
-          includeUpdaterJson: ${{ github.event_name == 'release' }}
+          uploadUpdaterJson: ${{ github.event_name == 'release' }}
           releaseId: ${{ github.event_name == 'release' && github.event.release.id || '' }}
 
       - name: Upload Windows EXE
