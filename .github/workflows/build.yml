@@ -22,10 +22,6 @@ jobs:
     permissions:
       contents: write
     timeout-minutes: 30
-    env:
-      # lld-link is preinstalled on GitHub's Windows runners and is much faster
-      # than link.exe for the large static dependency graph in this application.
-      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: lld-link
     strategy:
       fail-fast: false
       matrix:
@@ -44,9 +40,9 @@ jobs:
             ~/.cargo/git
             src-tauri/target
             node_modules
-          key: ${{ runner.os }}-crosscode-v2-${{ hashFiles('src-tauri/Cargo.lock', 'bun.lock') }}
+          key: ${{ runner.os }}-crosscode-v3-${{ hashFiles('src-tauri/Cargo.lock', 'bun.lock') }}
           restore-keys: |
-            ${{ runner.os }}-crosscode-v2-
+            ${{ runner.os }}-crosscode-v3-
             ${{ matrix.platform }}-crosscode-
             ${{ runner.os }}-crosscode-
 
@@ -60,7 +56,6 @@ jobs:
         shell: pwsh
         run: |
           perl --version | Select-Object -First 2
-          lld-link --version
 
       - uses: oven-sh/setup-bun@v2
         with:
