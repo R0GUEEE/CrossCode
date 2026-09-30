@@ -145,10 +145,10 @@ impl RemoteMacProfile {
             .file_name()
             .and_then(|name| name.to_str())
             .ok_or("Xcode project entry point has an invalid name")?;
-        let project_flag = if matches!(info.kind, ProjectKind::XcodeProject) {
-            "-project"
-        } else {
-            "-workspace"
+        let project_flag = match info.kind {
+            ProjectKind::XcodeProject => "-project",
+            // Anything else is a workspace; detection only calls this for the two.
+            _ => "-workspace",
         };
         let mut arguments = vec![project_flag.to_string(), shell_quote(entry_name)];
         append_scheme_and_configuration(&mut arguments, target, scheme, configuration);
@@ -207,7 +207,9 @@ pub async fn test_connection(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::builder::config::{ProjectInfo, ProjectKind};
+    use crate::builder::config::{
+        project_kind_label, PackageMetadata, ProjectInfo, ProjectKind,
+    };
 
     fn profile() -> RemoteMacProfile {
         RemoteMacProfile {
@@ -234,8 +236,10 @@ mod tests {
             targets: Vec::new(),
             schemes: Vec::new(),
             configurations: Vec::new(),
-            build_type: String::new(),
+            build_type: project_kind_label(&kind),
             detected_files: Vec::new(),
+            package_metadata: PackageMetadata::default(),
+            warnings: Vec::new(),
         }
     }
 

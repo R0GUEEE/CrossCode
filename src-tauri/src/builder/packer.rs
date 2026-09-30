@@ -4,7 +4,6 @@ use std::{
     path::PathBuf,
 };
 
-use dircpy::CopyBuilder;
 use zip::write::SimpleFileOptions;
 
 use crate::builder::config::{BuildSettings, ProjectConfig};
@@ -66,11 +65,76 @@ pub fn pack(
             .map_err(|e| format!("Failed to create Resources directory: {}", e))?;
     }
 
-    CopyBuilder::new(&resources, &app_path)
-        .run()
-        .map_err(|e| format!("Failed to copy resources: {}", e))?;
+    copy_directory(&resources, &app_path)?;
+    copy_declared_resources(project_path.clone(), config, &app_path)?;
 
     Ok(app_path)
+}
+
+/// Copies the resource folders and bundles the manifest declares (or the ones
+/// found next to the sources), keeping their layout relative to the project.
+///
+/// SwiftPM copies declared resources next to the executable, so a `Resources`
+/// folder declared by the manifest ends up in the same place as the one the
+/// packer already handles; anything else is copied under `Resources/` in the
+/// bundle so the app can still find it.
+fn copy_declared_resources(
+    project_path: PathBuf,
+    config: &ProjectConfig,
+    app_path: &PathBuf,
+) -> Result<(), String> {
+    let metadata = &config.metadata;
+    let mut copied = std::collections::HashSet::new();
+    for declared in metadata.resources.iter().chain(metadata.asset_catalogs.iter()) {
+        let source = PathBuf::from(declared);
+        let source = if source.is_absolute() {
+            source
+        } else {
+            project_path.join(declared)
+        };
+        if !source.exists() {
+            continue;
+        }
+        let name = match source.file_name().and_then(|name| name.to_str()) {
+            Some(name) => name.to_string(),
+            None => continue,
+        };
+        if !copied.insert(name.clone()) {
+            continue;
+        }
+        let destination = app_path.join(&name);
+        if source.is_dir() {
+            copy_directory(&source, &destination)?;
+        } else {
+            fs::copy(&source, &destination)
+                .map_err(|e| format!("Failed to copy resource {}: {}", declared, e))?;
+        }
+    }
+    Ok(())
+}
+
+/// `fs::copy` does not recurse, so directories are walked here instead of
+/// pulling in a copy crate: a declared resource folder is usually a handful of
+/// files, and this keeps the error messages specific.
+fn copy_directory(source: &PathBuf, destination: &PathBuf) -> Result<(), String> {
+    if !source.is_dir() {
+        return Ok(());
+    }
+    fs::create_dir_all(destination)
+        .map_err(|e| format!("Failed to create {}: {}", destination.display(), e))?;
+    let entries = fs::read_dir(source)
+        .map_err(|e| format!("Failed to read {}: {}", source.display(), e))?;
+    for entry in entries.filter_map(Result::ok) {
+        let path = entry.path();
+        let target = destination.join(entry.file_name());
+        if path.is_dir() {
+            copy_directory(&path, &target)?;
+        } else {
+            fs::copy(&path, &target)
+                .map_err(|e| format!("Failed to copy {}: {}", path.display(), e))?;
+        }
+    }
+    Ok(())
 }
 
 pub fn zip_ipa(app: PathBuf, config: &ProjectConfig) -> Result<PathBuf, String> {

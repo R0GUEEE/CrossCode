@@ -113,3 +113,10 @@
   width: calc(100% - var(--padding-md) * 2);
   min-width: 0;
 }
+
+.project-capability-warn {
+  background: transparent;
+  border: 1px solid var(--joy-palette-warning-500, #f0a020);
+  color: var(--joy-palette-warning-500, #f0a020);
+  cursor: help;
+}

@@ -98,6 +98,26 @@ The editor is a full Monaco workbench wired to the same files through a custom
 file system provider, so creating, renaming and deleting folders works from
 both sides and the editor is told about changes made outside the app.
 
+## Package metadata
+
+CrossCode reads the manifest when it opens a package and shows what it found in
+the project bar:
+
+- **`iOS 17.0+`** — the deployment target the manifest declares. A package that
+  declares other platforms but no iOS gets a warning instead, because building
+  it for a device is likely to fail.
+- **`N asset catalogs`** — `.xcassets` bundles were found. They cannot be
+  compiled on Linux (`actool` lives in Xcode), so their contents are copied into
+  the app bundle as files instead of being compiled into `Assets.car`; the badge
+  says so, and the tooltip names the folders.
+- **`N warnings`** — anything else worth knowing before a build, such as a
+  target that cannot be built for iOS.
+
+The metadata also feeds the packer: resource folders the manifest declares (or
+the ones found next to a target's sources, `Resources/` and `assets/`) are
+copied into the bundle, preserving their layout, rather than only the
+`Resources/` folder at the project root.
+
 ## Building on a remote Mac
 
 An `.xcodeproj` or `.xcworkspace` cannot be built with SwiftPM on Linux, so for

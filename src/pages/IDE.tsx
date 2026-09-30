@@ -60,6 +60,17 @@ type ProjectValidation =
   | "InvalidPackage"
   | "InvalidToolchain";
 
+/** Mirrors `PackageMetadata` in `src-tauri/src/builder/config.rs`. */
+type PackageMetadata = {
+  platforms: { name: string; version: string }[];
+  assetCatalogs: string[];
+  resources: string[];
+  iosTargets: string[];
+  supportedTargets: string[];
+  /** Minimum iOS version, when the manifest declares one. */
+  deploymentTarget: string | null;
+};
+
 type ProjectInfo = {
   kind: string;
   root: string;
@@ -70,6 +81,8 @@ type ProjectInfo = {
   configurations: string[];
   buildType: string;
   detectedFiles: string[];
+  packageMetadata: PackageMetadata;
+  warnings: string[];
 };
 
 type WorkspaceTarget = {
@@ -406,6 +419,32 @@ export default () => {
                 <span key={capability} className="project-capability">{formatProjectKind(capability)}</span>
               ))}
           </span>
+          {projectInfo.packageMetadata.deploymentTarget && (
+            <span
+              className="project-capability"
+              title="Minimum iOS version declared by the package"
+            >
+              iOS {projectInfo.packageMetadata.deploymentTarget}+
+            </span>
+          )}
+          {projectInfo.packageMetadata.assetCatalogs.length > 0 && (
+            <span
+              className="project-capability project-capability-warn"
+              title={`Asset catalogs cannot be compiled on Linux: ${projectInfo.packageMetadata.assetCatalogs.join(", ")}`}
+            >
+              {projectInfo.packageMetadata.assetCatalogs.length} asset catalog
+              {projectInfo.packageMetadata.assetCatalogs.length === 1 ? "" : "s"}
+            </span>
+          )}
+          {projectInfo.warnings.length > 0 && (
+            <span
+              className="project-capability project-capability-warn"
+              title={projectInfo.warnings.join("\n")}
+            >
+              {projectInfo.warnings.length} warning
+              {projectInfo.warnings.length === 1 ? "" : "s"}
+            </span>
+          )}
           {workspaceTargets.length > 0 && (
             <Select
               size="sm"
