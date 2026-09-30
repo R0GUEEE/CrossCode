@@ -13,31 +13,41 @@ on:
   release:
     types: [published]
 
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'release' }}
+
 jobs:
   build:
     permissions:
       contents: write
+    timeout-minutes: 30
+    env:
+      # lld-link is preinstalled on GitHub's Windows runners and is much faster
+      # than link.exe for the large static dependency graph in this application.
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: lld-link
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: "windows-latest"
-            args: ""
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Cache Rust and bun dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             src-tauri/target
             node_modules
-          key: ${{ matrix.platform }}-crosscode-${{ hashFiles('**/Cargo.lock', 'package-lock.json') }}
+          key: ${{ runner.os }}-crosscode-v2-${{ hashFiles('src-tauri/Cargo.lock', 'bun.lock') }}
           restore-keys: |
+            ${{ runner.os }}-crosscode-v2-
+            ${{ matrix.platform }}-crosscode-
             ${{ runner.os }}-crosscode-
 
       - name: Install Rust stable
@@ -46,9 +56,11 @@ jobs:
       - name: Add MSVC to PATH
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install Perl and Make for Windows
+      - name: Verify native build tools
+        shell: pwsh
         run: |
-          choco install strawberryperl make --no-progress
+          perl --version | Select-Object -First 2
+          lld-link --version
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -61,22 +73,24 @@ jobs:
         run: bun test src
 
       - name: Clean old bundles
-        run: bunx rimraf src-tauri/target/release/bundle
+        shell: pwsh
+        run: Remove-Item -Recurse -Force src-tauri/target/release/bundle -ErrorAction SilentlyContinue
 
       - name: Build
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          args: ${{ matrix.args }}
+          args: ${{ github.event_name == 'release' && '--bundles msi,nsis' || '--bundles nsis' }}
           includeUpdaterJson: ${{ github.event_name == 'release' }}
           releaseId: ${{ github.event_name == 'release' && github.event.release.id || '' }}
 
       - name: Upload Windows EXE
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-exe
           path: |
             ${{ github.workspace }}/src-tauri/target/release/bundle/**/*.exe
+          if-no-files-found: error
