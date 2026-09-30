@@ -569,12 +569,27 @@ export default () => {
               sx={{ width: 100 }}
             />
           </div>
-          <Input
-            placeholder="/Users/me/Projects/MyApp"
-            value={remoteMacProfile.projectPath}
-            onChange={(event) => setRemoteMac((profile) => ({ ...profile, projectPath: event.target.value }))}
-            aria-label="Project path on Remote Mac"
-          />
+          <div className="remote-mac-row">
+            <Input
+              placeholder="/Users/me/Projects/MyApp"
+              value={remoteMacProfile.projectPath}
+              onChange={(event) => setRemoteMac((profile) => ({ ...profile, projectPath: event.target.value }))}
+              aria-label="Project path on Remote Mac"
+              sx={{ flex: 1 }}
+            />
+            <Button
+              variant="outlined"
+              disabled={!path}
+              onClick={() =>
+                setRemoteMac((profile) => ({
+                  ...profile,
+                  projectPath: suggestRemoteProjectPath(path ?? "", normalizeRemoteMacProfile(profile).user),
+                }))
+              }
+            >
+              Suggest
+            </Button>
+          </div>
           <Select
             value={remoteMacProfile.auth}
             onChange={(_, value) =>
