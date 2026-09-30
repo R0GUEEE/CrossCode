@@ -360,15 +360,14 @@ export const IDEProvider: React.FC<{
         return;
 
       hasCheckedForUpdates = true;
-      checkForUpdates();
+      void checkForUpdates().catch((error) => {
+        console.error("Failed to check for updates:", error);
+      });
     };
 
     check();
   }, [initialized, checkForUpdates, store, storeInitialized]);
 
-  const listenerAdded = useRef(false);
-  const listener2Added = useRef(false);
-  const listener3Added = useRef(false);
   const unlisten = useRef<() => void>(() => {});
   const unlisten2fa = useRef<() => void>(() => {});
   const unlistenAppleid = useRef<() => void>(() => {});
@@ -381,8 +380,9 @@ export const IDEProvider: React.FC<{
   const saveCredentials = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (!listenerAdded.current) {
-      (async () => {
+    let cancelled = false;
+    (async () => {
+      try {
         const unlistenFn = await listen("idevices", (event) => {
           let devices = event.payload as DeviceInfo[];
           setDevices(devices);
@@ -390,18 +390,22 @@ export const IDEProvider: React.FC<{
             addToast.info("No devices found");
           }
         });
-        unlisten.current = unlistenFn;
-      })();
-      listenerAdded.current = true;
-    }
+        if (cancelled) unlistenFn();
+        else unlisten.current = unlistenFn;
+      } catch (error) {
+        console.error("Failed to listen for device updates:", error);
+      }
+    })();
     return () => {
+      cancelled = true;
       unlisten.current();
     };
   }, []);
 
   useEffect(() => {
-    if (!listener2Added.current) {
-      (async () => {
+    let cancelled = false;
+    (async () => {
+      try {
         const unlistenFn = await listen("2fa-required", async () => {
           if (isMainWindow) {
             setTfaOpen(true);
@@ -409,18 +413,22 @@ export const IDEProvider: React.FC<{
             addToast.info("Please complete 2FA in the main window.");
           }
         });
-        unlisten2fa.current = unlistenFn;
-      })();
-      listener2Added.current = true;
-    }
+        if (cancelled) unlistenFn();
+        else unlisten2fa.current = unlistenFn;
+      } catch (error) {
+        console.error("Failed to listen for 2FA requests:", error);
+      }
+    })();
     return () => {
+      cancelled = true;
       unlisten2fa.current();
     };
   }, []);
 
   useEffect(() => {
-    if (!listener3Added.current) {
-      (async () => {
+    let cancelled = false;
+    (async () => {
+      try {
         const unlistenFn = await listen("apple-id-required", () => {
           if (isMainWindow) {
             setAppleIdOpen(true);
@@ -428,30 +436,36 @@ export const IDEProvider: React.FC<{
             addToast.info("Please login to your Apple ID in the main window.");
           }
         });
-        unlistenAppleid.current = unlistenFn;
-      })();
-      listener3Added.current = true;
-    }
+        if (cancelled) unlistenFn();
+        else unlistenAppleid.current = unlistenFn;
+      } catch (error) {
+        console.error("Failed to listen for Apple ID requests:", error);
+      }
+    })();
     return () => {
+      cancelled = true;
       unlistenAppleid.current();
     };
   }, []);
 
-  const ddiListenerAdded = useRef(false);
   const ddiUnlisten = useRef<() => void>(() => {});
 
   useEffect(() => {
-    if (!ddiListenerAdded.current) {
-      (async () => {
+    let cancelled = false;
+    (async () => {
+      try {
         const unlistenFn = await listen("ddi-mount-progress", (event) => {
           const progress = event.payload as number;
           setDdiProgress(progress);
         });
-        ddiUnlisten.current = unlistenFn;
-      })();
-      ddiListenerAdded.current = true;
-    }
+        if (cancelled) unlistenFn();
+        else ddiUnlisten.current = unlistenFn;
+      } catch (error) {
+        console.error("Failed to listen for DDI progress:", error);
+      }
+    })();
     return () => {
+      cancelled = true;
       ddiUnlisten.current();
     };
   }, [setDdiProgress]);

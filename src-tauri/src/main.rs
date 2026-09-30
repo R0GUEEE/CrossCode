@@ -88,22 +88,30 @@ fn main() {
                 Err(_) => {}
             }
 
-            let store = app.store("preferences.json")?;
-
-            let open_last = if store.has("general/startup") {
-                store.get("general/startup").unwrap().as_str().unwrap() == "open-last"
-            } else {
-                true
+            let store = match app.store("preferences.json") {
+                Ok(store) => store,
+                Err(error) => {
+                    eprintln!("Failed to load preferences: {error}");
+                    return Ok(());
+                }
             };
+
+            let open_last = store
+                .get("general/startup")
+                .and_then(|value| value.as_str().map(|value| value == "open-last"))
+                .unwrap_or(true);
 
             if open_last {
                 if let Some(last_project) = store.get("last-opened-project") {
                     if last_project.is_string() {
-                        let path = last_project.as_str().unwrap();
-                        let url_str = format!("/ide/{}", path);
+                        let path = last_project.as_str().unwrap_or_default();
+                        let path_json = serde_json::to_string(path)
+                            .map_err(|error| format!("Failed to encode project path: {error}"))?;
                         app.get_webview_window("main")
-                            .unwrap()
-                            .eval(&format!("window.location.replace('{}')", url_str))?;
+                            .ok_or_else(|| "Main window is unavailable".to_string())?
+                            .eval(&format!(
+                                "window.location.replace('/ide/' + encodeURIComponent({path_json}))"
+                            ))?;
                     }
                 }
             }
