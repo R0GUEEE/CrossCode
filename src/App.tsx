@@ -42,30 +42,35 @@ const theme = extendTheme({
   },
 });
 
-// Layout with IDE-related providers
-const IDELayout = () => {
+const IDELayoutContent = () => {
   const [appTheme] = useStore("appearance/theme", "dark");
   return (
-    <StoreProvider>
-      <ToastProvider
-        toastOptions={{ placement: "bottom-right" }}
-        toastStyles={
-          appTheme == "dark"
-            ? { toastBgColor: "#333", toastTextColor: "#fff" }
-            : {}
-        }
-      >
-        <UpdateProvider>
-          <CommandProvider>
-            <IDEProvider>
-              <Outlet />
-            </IDEProvider>
-          </CommandProvider>
-        </UpdateProvider>
-      </ToastProvider>
-    </StoreProvider>
+    <ToastProvider
+      toastOptions={{ placement: "bottom-right" }}
+      toastStyles={
+        appTheme == "dark"
+          ? { toastBgColor: "#333", toastTextColor: "#fff" }
+          : {}
+      }
+    >
+      <UpdateProvider>
+        <CommandProvider>
+          <IDEProvider>
+            <Outlet />
+          </IDEProvider>
+        </CommandProvider>
+      </UpdateProvider>
+    </ToastProvider>
   );
 };
+
+// Layout with IDE-related providers. Keep the store above all consumers so a
+// store failure can fall back to the app's default preferences.
+const IDELayout = () => (
+  <StoreProvider>
+    <IDELayoutContent />
+  </StoreProvider>
+);
 
 const App = () => {
   return (

@@ -31,6 +31,19 @@ import { isCompatable } from "../components/SwiftMenu";
 
 let isMainWindow = getCurrentWindow().label === "main";
 
+const STARTUP_PROBE_TIMEOUT_MS = 10000;
+
+const withStartupTimeout = <T,>(promise: Promise<T>, name: string) =>
+  Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(
+        () => reject(new Error(`${name} timed out during startup`)),
+        STARTUP_PROBE_TIMEOUT_MS
+      );
+    }),
+  ]);
+
 export interface IDEContextType {
   initialized: boolean;
   ready: boolean | null;
@@ -266,29 +279,40 @@ export const IDEProvider: React.FC<{
     if (startedInitializing.current) return;
     startedInitializing.current = true;
     let initPromises: Promise<void>[] = [];
-    initPromises.push(scanToolchains());
     initPromises.push(
-      invoke("has_wsl").then((response) => {
-        setHasWSL(response as boolean);
-      })
+      withStartupTimeout(scanToolchains(), "Swift toolchain scan")
     );
     initPromises.push(
-      invoke("is_windows").then((response) => {
-        setIsWindows(response as boolean);
-      })
+      withStartupTimeout(invoke("has_wsl"), "WSL detection").then(
+        (response) => {
+          setHasWSL(response as boolean);
+        }
+      )
     );
     initPromises.push(
-      invoke<string>("has_darwin_sdk", {
-        toolchainPath: selectedToolchain?.path ?? "",
-      }).then((response) => {
+      withStartupTimeout(invoke("is_windows"), "Windows detection").then(
+        (response) => {
+          setIsWindows(response as boolean);
+        }
+      )
+    );
+    initPromises.push(
+      withStartupTimeout(
+        invoke<string>("has_darwin_sdk", {
+          toolchainPath: selectedToolchain?.path ?? "",
+        }),
+        "Darwin SDK detection"
+      ).then((response) => {
         setHasDarwinSDK(response != "none");
         setDarwinSDKVersion(response);
       })
     );
     initPromises.push(
-      invoke("has_limited_ram").then((response) => {
-        setHasLimitedRam(response as boolean);
-      })
+      withStartupTimeout(invoke("has_limited_ram"), "RAM detection").then(
+        (response) => {
+          setHasLimitedRam(response as boolean);
+        }
+      )
     );
 
     Promise.allSettled(initPromises).then((results) => {
@@ -304,12 +328,21 @@ export const IDEProvider: React.FC<{
   useEffect(() => {
     if (!initialized) return;
     let changeWindows = async () => {
-      let splash = await Window.getByLabel("splashscreen");
-      let main = await Window.getByLabel("main");
-      if (splash && main) {
-        splash.close();
-        await main.show();
-        main.setFocus();
+      try {
+        const splash = await Window.getByLabel("splashscreen");
+        const main = await Window.getByLabel("main");
+        if (main) {
+          // Show the main window first so a close failure cannot leave the
+          // user with only the splash screen.
+          await main.show();
+          await main.setFocus();
+        }
+        if (splash) await splash.close();
+      } catch (error) {
+        console.error(
+          "Failed to switch from splash screen to main window:",
+          error
+        );
       }
     };
     changeWindows();

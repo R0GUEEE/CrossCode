@@ -33,23 +33,34 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     const initializeStore = async () => {
-      const storeInstance = await load("preferences.json");
-      setStore(storeInstance);
+      try {
+        const storeInstance = await load("preferences.json");
+        setStore(storeInstance);
 
-      let theme = await storeInstance.get("appearance/theme");
-      if (theme === undefined) theme = "dark";
-      await setTheme(theme as "light" | "dark");
-      setMode(theme as "light" | "dark");
+        let theme = await storeInstance.get("appearance/theme");
+        if (theme === undefined) theme = "dark";
+        try {
+          await setTheme(theme as "light" | "dark");
+          setMode(theme as "light" | "dark");
+        } catch (error) {
+          console.error("Failed to apply saved theme:", error);
+        }
 
-      storeInstance.set("isCrossCodePrefs", true);
+        await storeInstance.set("isCrossCodePrefs", true);
 
-      const keys = await storeInstance.keys();
-      const values: { [key: string]: any } = {};
-      for (const key of keys) {
-        values[key] = await storeInstance.get(key);
+        const keys = await storeInstance.keys();
+        const values: { [key: string]: any } = {};
+        for (const key of keys) {
+          values[key] = await storeInstance.get(key);
+        }
+        setStoreValues(values);
+      } catch (error) {
+        console.error("Failed to initialize preferences store:", error);
+      } finally {
+        // A corrupt or unavailable preferences file must not keep the splash
+        // screen visible forever. The app can operate with default values.
+        setStoreInitialized(true);
       }
-      setStoreValues(values);
-      setStoreInitialized(true);
     };
 
     initializeStore();
@@ -94,7 +105,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({
     [storeValues, setStoreValue, store]
   );
 
-  if (!store || !storeInitialized) {
+  if (!storeInitialized) {
     return null;
   }
 
