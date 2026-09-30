@@ -180,16 +180,20 @@ export const IDEProvider: React.FC<{
     }
   }, [selectedToolchain]);
 
-  const scanToolchains = useCallback(() => {
-    return new Promise<void>(async (resolve) => {
-      let response = await invoke<ListToolchainResponse>(
+  const scanToolchains = useCallback(async () => {
+    try {
+      const response = await invoke<ListToolchainResponse>(
         "get_swiftly_toolchains"
       );
-      if (response) {
-        setToolchains(response);
-        resolve();
-      }
-    });
+      setToolchains(response);
+    } catch (error) {
+      console.error("Failed to scan Swift toolchains:", error);
+      setToolchains({
+        swiftlyInstalled: false,
+        swiftlyVersion: null,
+        toolchains: [],
+      });
+    }
   }, []);
 
   const locateToolchain = useCallback(async () => {
@@ -287,14 +291,14 @@ export const IDEProvider: React.FC<{
       })
     );
 
-    Promise.all(initPromises)
-      .then(() => {
-        setInitialized(true);
-      })
-      .catch((error) => {
-        console.error("Error initializing IDE context: ", error);
-        alert("An error occurred while initializing the IDE context: " + error);
+    Promise.allSettled(initPromises).then((results) => {
+      results.forEach((result) => {
+        if (result.status === "rejected") {
+          console.error("Error initializing IDE context: ", result.reason);
+        }
       });
+      setInitialized(true);
+    });
   }, []);
 
   useEffect(() => {
