@@ -1,7 +1,7 @@
 import Splitter, { GutterTheme, SplitDirection } from "@devbookhq/splitter";
 import Tile from "../components/Tiles/Tile";
 import FileExplorer from "../components/Tiles/FileExplorer";
-import { useCallback, useContext, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import Editor from "../components/Tiles/Editor";
 import MenuBar from "../components/Menu/MenuBar";
 import "./IDE.css";
@@ -43,7 +43,13 @@ import {
   objectAt,
   objectName,
 } from "../xcode-import/pbxproj";
-import { defaultRemoteMacProfile, RemoteMacProfile } from "../utilities/remote-mac";
+import {
+  defaultRemoteMacProfile,
+  isRemoteMacUsable,
+  normalizeRemoteMacProfile,
+  suggestRemoteProjectPath,
+  RemoteMacProfile,
+} from "../utilities/remote-mac";
 
 export interface IDEProps {}
 
@@ -165,6 +171,8 @@ export default () => {
     `${workspaceSelectionKey}/remote-mac`,
     defaultRemoteMacProfile
   );
+  // Profiles saved by an older version are missing the newer fields.
+  const remoteMacProfile = useMemo(() => normalizeRemoteMacProfile(remoteMac), [remoteMac]);
   const [remoteMacDialogOpen, setRemoteMacDialogOpen] = useState(false);
   const [editor, setEditor] = useState<IStandaloneCodeEditor | null>(null);
   const { addToast } = useToast();
@@ -436,10 +444,14 @@ export default () => {
           {(projectInfo.kind === "xcodeProject" || projectInfo.kind === "xcodeWorkspace") && (
             <Button
               size="sm"
-              variant={remoteMac.enabled ? "soft" : "plain"}
+              variant={remoteMacProfile.enabled ? "soft" : "plain"}
               onClick={() => setRemoteMacDialogOpen(true)}
             >
-              {remoteMac.enabled ? `Remote: ${remoteMac.host}` : "Remote Mac"}
+              {remoteMacProfile.enabled
+                ? `Remote: ${remoteMacProfile.host || "not configured"}${
+                    remoteMacProfile.runTests ? " (tests)" : ""
+                  }`
+                : "Remote Mac"}
             </Button>
           )}
           {projectInfo.entryPoint && <span className="project-entry-point">{projectInfo.entryPoint}</span>}
@@ -533,25 +545,25 @@ export default () => {
           </Typography>
           <Checkbox
             label="Use this Mac for Xcode builds"
-            checked={remoteMac.enabled}
+            checked={remoteMacProfile.enabled}
             onChange={(event) => setRemoteMac((profile) => ({ ...profile, enabled: event.target.checked }))}
           />
           <Input
             placeholder="mac-mini.local"
-            value={remoteMac.host}
+            value={remoteMacProfile.host}
             onChange={(event) => setRemoteMac((profile) => ({ ...profile, host: event.target.value }))}
             aria-label="Remote Mac host"
           />
           <div className="remote-mac-row">
             <Input
               placeholder="macOS user"
-              value={remoteMac.user}
+              value={remoteMacProfile.user}
               onChange={(event) => setRemoteMac((profile) => ({ ...profile, user: event.target.value }))}
               aria-label="Remote Mac user"
             />
             <Input
               type="number"
-              value={remoteMac.port}
+              value={remoteMacProfile.port}
               onChange={(event) => setRemoteMac((profile) => ({ ...profile, port: Number(event.target.value) || 22 }))}
               aria-label="SSH port"
               sx={{ width: 100 }}
@@ -559,19 +571,80 @@ export default () => {
           </div>
           <Input
             placeholder="/Users/me/Projects/MyApp"
-            value={remoteMac.projectPath}
+            value={remoteMacProfile.projectPath}
             onChange={(event) => setRemoteMac((profile) => ({ ...profile, projectPath: event.target.value }))}
             aria-label="Project path on Remote Mac"
           />
+          <Select
+            value={remoteMacProfile.auth}
+            onChange={(_, value) =>
+              setRemoteMac((profile) => ({ ...profile, auth: value === "identity" ? "identity" : "agent" }))
+            }
+          >
+            <Option value="agent">Use the SSH agent / default key</Option>
+            <Option value="identity">Use a private key file</Option>
+          </Select>
+          {remoteMacProfile.auth === "identity" && (
+            <div className="remote-mac-row">
+              <Input
+                placeholder="~/.ssh/id_ed25519"
+                value={remoteMacProfile.identityFile}
+                onChange={(event) =>
+                  setRemoteMac((profile) => ({ ...profile, identityFile: event.target.value }))
+                }
+                aria-label="Private key file"
+                sx={{ flex: 1 }}
+              />
+              <Button
+                variant="outlined"
+                onClick={async () => {
+                  const file = await openFileDialog({
+                    multiple: false,
+                    directory: false,
+                    title: "Select a private key",
+                  });
+                  if (typeof file === "string") {
+                    setRemoteMac((profile) => ({ ...profile, identityFile: file }));
+                  }
+                }}
+              >
+                Browse
+              </Button>
+            </div>
+          )}
+          <Input
+            placeholder="Optional: generic/platform=iOS or platform=iOS Simulator,name=iPhone 17"
+            value={remoteMacProfile.destination}
+            onChange={(event) => setRemoteMac((profile) => ({ ...profile, destination: event.target.value }))}
+            aria-label="xcodebuild destination"
+          />
+          <Input
+            placeholder="Optional: ~/Desktop/MyApp.xcresult"
+            value={remoteMacProfile.resultBundlePath}
+            onChange={(event) =>
+              setRemoteMac((profile) => ({ ...profile, resultBundlePath: event.target.value }))
+            }
+            aria-label="Result bundle path"
+          />
+          <Checkbox
+            label="Run tests instead of building (Ctrl+U on this workspace)"
+            checked={remoteMacProfile.runTests}
+            onChange={(event) => setRemoteMac((profile) => ({ ...profile, runTests: event.target.checked }))}
+          />
+          <Typography level="body-xs">
+            {
+              "The sources are still built from your local workspace — keep both copies in sync (for example with git or a shared folder) before building."
+            }
+          </Typography>
           <div className="remote-mac-actions">
             <Button
               variant="outlined"
               onClick={() => {
-                invoke("test_remote_mac", { remoteMac })
+                invoke("test_remote_mac", { remoteMac: { ...remoteMacProfile, enabled: true } })
                   .then(() => addToast.success("Remote Mac is ready for Xcode builds."))
                   .catch((error) => addToast.error(String(error)));
               }}
-              disabled={!remoteMac.host || !remoteMac.user || !remoteMac.projectPath}
+              disabled={!isRemoteMacUsable({ ...remoteMacProfile, enabled: true })}
             >
               Test Connection
             </Button>

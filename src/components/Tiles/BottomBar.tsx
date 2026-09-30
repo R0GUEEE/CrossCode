@@ -13,7 +13,11 @@ import { useParams } from "react-router";
 import { useStore } from "../../utilities/StoreContext";
 import { parseBuildProblems, parseTestResults } from "../../utilities/build-results";
 import { ProblemsPanel, TestsPanel } from "./BuildResults";
-import { defaultRemoteMacProfile, RemoteMacProfile } from "../../utilities/remote-mac";
+import {
+  defaultRemoteMacProfile,
+  normalizeRemoteMacProfile,
+  RemoteMacProfile,
+} from "../../utilities/remote-mac";
 
 export default function BottomBar() {
   const { consoleLines } = useIDE();
@@ -21,8 +25,8 @@ export default function BottomBar() {
   const workspaceSelectionKey = `workspace/${encodeURIComponent(path ?? "")}`;
   const [remoteMac] = useStore<RemoteMacProfile>(`${workspaceSelectionKey}/remote-mac`, defaultRemoteMacProfile);
   const problems = useMemo(
-    () => parseBuildProblems(consoleLines, path ?? "", remoteMac.projectPath),
-    [consoleLines, path, remoteMac.projectPath]
+    () => parseBuildProblems(consoleLines, path ?? "", normalizeRemoteMacProfile(remoteMac).projectPath),
+    [consoleLines, path, remoteMac]
   );
   const testResults = useMemo(() => parseTestResults(consoleLines), [consoleLines]);
   const staticTabs = useMemo(() => [

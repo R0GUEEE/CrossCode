@@ -31,7 +31,7 @@ Check out the [Getting Started](https://github.com/nab138/CrossCode/wiki#getting
 ## Features
 
 - Generate a Darwin SDK for linux from a user provided copy of the latest Xcode (e.g. Xcode 27.0) to build the apps
-- Build apps using swift package manager
+- Build apps using swift package manager, or hand Xcode projects to a Mac over SSH
 - Visual SwiftUI builder: assemble views on a canvas, edit their properties, wire up tap actions, and generate the SwiftUI source
 - Import an existing Xcode project into a buildable CrossCode package
 - Log in with your Apple ID to sign apps
@@ -98,7 +98,36 @@ The editor is a full Monaco workbench wired to the same files through a custom
 file system provider, so creating, renaming and deleting folders works from
 both sides and the editor is told about changes made outside the app.
 
-## Importing an Xcode project
+## Building on a remote Mac
+
+An `.xcodeproj` or `.xcworkspace` cannot be built with SwiftPM on Linux, so for
+those projects CrossCode can hand the build to a Mac you already own over SSH.
+Open the `Remote Mac` button in the project bar (it is only shown for Xcode
+projects and workspaces):
+
+1. turn on **Use this Mac for Xcode builds**,
+2. enter the host, the macOS user and the port,
+3. choose how to authenticate — the SSH agent/default key, or a private key file
+   you pick with **Browse** (the file has to exist on the machine running
+   CrossCode),
+4. enter the path of the project **on the Mac** (the folder, not the
+   `.xcodeproj` — CrossCode adds the entry point itself),
+5. optionally set an `xcodebuild` destination (`generic/platform=iOS`,
+   `platform=iOS Simulator,name=iPhone 17`, ...), a result bundle path and
+   switch on **Run tests instead of building**,
+6. **Test Connection** runs `xcodebuild -version` over the same SSH settings, so
+   a mistake in the key, the host or the port is reported before a build starts.
+
+`Build .ipa (Debug/Release)` and `Test Selected Workspace` then run their
+`xcodebuild` invocation on the Mac, and the output (including compiler
+diagnostics) streams into the normal build console. Paths printed by the remote
+Mac are mapped back onto your local workspace, so a problem in the Problems
+panel opens the right file and line locally.
+
+What this does **not** do: it does not upload your sources. The Mac builds the
+copy of the project that is in `projectPath` on its own disk, so keep the two in
+sync (git, a shared folder, a sync tool). If the local and remote copies differ,
+the build reflects the remote one.
 
 `Import Xcode Project` on the welcome page (or *File -> Open -> Import Xcode
 Project...*) converts an existing `.xcodeproj` into a package CrossCode can

@@ -1,7 +1,7 @@
 import Menu from "@mui/joy/Menu";
 import List from "@mui/joy/List";
 import ListItem from "@mui/joy/ListItem";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MenuBarButton from "./MenuBarButton";
 import MenuGroup from "./MenuGroup";
 import {
@@ -25,7 +25,11 @@ import { useStore } from "../../utilities/StoreContext";
 import { useToast } from "react-toast-plus";
 import bar from "./MenuBarDefinition";
 import { IStandaloneCodeEditor } from "@codingame/monaco-vscode-api/vscode/vs/editor/standalone/browser/standaloneCodeEditor";
-import { defaultRemoteMacProfile, RemoteMacProfile } from "../../utilities/remote-mac";
+import {
+  defaultRemoteMacProfile,
+  normalizeRemoteMacProfile,
+  RemoteMacProfile,
+} from "../../utilities/remote-mac";
 
 export interface MenuBarProps {
   callbacks: Record<string, () => void>;
@@ -53,7 +57,8 @@ export default function MenuBar({ callbacks, editor }: MenuBarProps) {
   const [selectedTarget] = useStore<string>(`${workspaceSelectionKey}/target`, "");
   const [selectedScheme] = useStore<string>(`${workspaceSelectionKey}/scheme`, "");
   const [selectedConfiguration] = useStore<string>(`${workspaceSelectionKey}/configuration`, "Debug");
-  const [remoteMac] = useStore<RemoteMacProfile>(`${workspaceSelectionKey}/remote-mac`, defaultRemoteMacProfile);
+  const [storedRemoteMac] = useStore<RemoteMacProfile>(`${workspaceSelectionKey}/remote-mac`, defaultRemoteMacProfile);
+  const remoteMac = useMemo(() => normalizeRemoteMacProfile(storedRemoteMac), [storedRemoteMac]);
   const { addToast } = useToast();
 
   const updateScreenshot = useCallback(

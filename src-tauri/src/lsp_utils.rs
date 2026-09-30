@@ -1,11 +1,11 @@
 use std::{path::PathBuf, process::Command};
 
-use serde::Deserialize;
 use sysinfo::System;
 use tauri::Emitter;
 
 use crate::builder::{
     config::{ProjectConfig, ProjectInfo, ProjectKind, ProjectValidation},
+    remote::{remote_project_command, shell_quote, RemoteAction, RemoteMacProfile},
     swift::{pipe_command, SwiftBin},
 };
 
@@ -27,16 +27,6 @@ pub fn detect_project(project_path: String) -> Result<ProjectInfo, String> {
     ProjectInfo::detect(PathBuf::from(project_path))
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RemoteMacProfile {
-    pub enabled: bool,
-    pub host: String,
-    pub user: String,
-    pub port: u16,
-    pub project_path: String,
-}
-
 #[tauri::command]
 pub async fn build_project(
     window: tauri::Window,
@@ -51,36 +41,22 @@ pub async fn build_project(
     let info = ProjectInfo::detect(root.clone())?;
     let build_root = PathBuf::from(&info.build_root);
 
-    if matches!(info.kind, ProjectKind::XcodeProject | ProjectKind::XcodeWorkspace)
-        && remote_mac.as_ref().is_some_and(|profile| profile.enabled)
-    {
-        let profile = remote_mac.as_ref().expect("profile was checked");
-        validate_remote_mac(profile)?;
-        let entry = info.entry_point.ok_or("Xcode project entry point is missing")?;
-        let entry_name = PathBuf::from(entry)
-            .file_name()
-            .and_then(|name| name.to_str())
-            .ok_or("Xcode project entry point has an invalid name")?
-            .to_string();
-        let project_flag = if matches!(info.kind, ProjectKind::XcodeProject) {
-            "-project"
-        } else {
-            "-workspace"
-        };
-        let mut arguments = vec![project_flag.to_string(), shell_quote(&entry_name)];
-        append_xcode_arguments(&mut arguments, &target, &scheme, &configuration);
-        arguments.push("build".to_string());
-        let remote_command = format!(
-            "cd {} && xcodebuild {}",
-            shell_quote(&profile.project_path),
-            arguments.join(" ")
-        );
-        let mut command = ssh_command(profile);
-        command.arg(remote_command);
+    if let Some(profile) = remote_mac.as_ref().filter(|profile| profile.enabled) {
+        let mut xcodebuild = RemoteMacProfile::xcodebuild_command(
+            &info,
+            RemoteAction::Build,
+            &target,
+            &scheme,
+            &configuration,
+        )?;
+        append_remote_options(profile, &mut xcodebuild);
         window
-            .emit("build-output", format!("Building on remote Mac {}@{}...", profile.user, profile.host))
+            .emit(
+                "build-output",
+                format!("Building on remote Mac {}@{}...", profile.user, profile.host),
+            )
             .map_err(|error| error.to_string())?;
-        return pipe_command(&mut command, &window, true).await;
+        return run_remote(&window, profile, &xcodebuild).await;
     }
 
     let mut command = match info.kind {
@@ -179,36 +155,22 @@ pub async fn test_project(
         return Err("Select a shared Xcode scheme before running tests".to_string());
     }
 
-    if matches!(info.kind, ProjectKind::XcodeProject | ProjectKind::XcodeWorkspace)
-        && remote_mac.as_ref().is_some_and(|profile| profile.enabled)
-    {
-        let profile = remote_mac.as_ref().expect("profile was checked");
-        validate_remote_mac(profile)?;
-        let entry = info.entry_point.ok_or("Xcode project entry point is missing")?;
-        let entry_name = PathBuf::from(entry)
-            .file_name()
-            .and_then(|name| name.to_str())
-            .ok_or("Xcode project entry point has an invalid name")?
-            .to_string();
-        let project_flag = if matches!(info.kind, ProjectKind::XcodeProject) {
-            "-project"
-        } else {
-            "-workspace"
-        };
-        let mut arguments = vec![project_flag.to_string(), shell_quote(&entry_name)];
-        append_xcode_arguments(&mut arguments, &target, &scheme, &configuration);
-        arguments.push("test".to_string());
-        let remote_command = format!(
-            "cd {} && xcodebuild {}",
-            shell_quote(&profile.project_path),
-            arguments.join(" ")
-        );
-        let mut command = ssh_command(profile);
-        command.arg(remote_command);
+    if let Some(profile) = remote_mac.as_ref().filter(|profile| profile.enabled) {
+        let mut xcodebuild = RemoteMacProfile::xcodebuild_command(
+            &info,
+            RemoteAction::Test,
+            &target,
+            &scheme,
+            &configuration,
+        )?;
+        append_remote_options(profile, &mut xcodebuild);
         window
-            .emit("build-output", format!("Testing on remote Mac {}@{}...", profile.user, profile.host))
+            .emit(
+                "build-output",
+                format!("Testing on remote Mac {}@{}...", profile.user, profile.host),
+            )
             .map_err(|error| error.to_string())?;
-        return pipe_command(&mut command, &window, true).await;
+        return run_remote(&window, profile, &xcodebuild).await;
     }
 
     let mut command = match info.kind {
@@ -290,61 +252,46 @@ fn append_xcode_selection(command: &mut Command, target: &str, scheme: &str, con
     }
 }
 
+
 #[tauri::command]
 pub async fn test_remote_mac(window: tauri::Window, remote_mac: RemoteMacProfile) -> Result<(), String> {
-    validate_remote_mac(&remote_mac)?;
-    let mut command = ssh_command(&remote_mac);
-    command.arg("xcodebuild -version");
     window
-        .emit("build-output", format!("Testing remote Mac {}@{}...", remote_mac.user, remote_mac.host))
+        .emit(
+            "build-output",
+            format!(
+                "Testing remote Mac {}@{}...",
+                remote_mac.user, remote_mac.host
+            ),
+        )
         .map_err(|error| error.to_string())?;
-    pipe_command(&mut command, &window, true).await
+    crate::builder::remote::test_connection(&window, &remote_mac).await
 }
 
-fn ssh_command(profile: &RemoteMacProfile) -> Command {
-    let mut command = Command::new("ssh");
-    command
-        .arg("-o")
-        .arg("BatchMode=yes")
-        .arg("-o")
-        .arg("ConnectTimeout=8")
-        .arg("-p")
-        .arg(profile.port.to_string())
-        .arg(format!("{}@{}", profile.user, profile.host));
-    command
-}
-
-fn validate_remote_mac(profile: &RemoteMacProfile) -> Result<(), String> {
-    if profile.host.trim().is_empty() || profile.user.trim().is_empty() {
-        return Err("Remote Mac host and user are required".to_string());
+/// Adds the destination and result bundle flags a profile may carry.
+fn append_remote_options(profile: &RemoteMacProfile, command: &mut String) {
+    if let Some(destination) = profile.destination.as_deref() {
+        if !destination.trim().is_empty() {
+            command.push_str(&format!(" -destination {}", shell_quote(destination.trim())));
+        }
     }
-    if profile.project_path.trim().is_empty() {
-        return Err("Remote Mac project path is required".to_string());
-    }
-    if !profile.host.chars().all(|character| character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | ':'))
-        || !profile.user.chars().all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '-' | '.'))
-    {
-        return Err("Remote Mac host or user contains unsupported characters".to_string());
-    }
-    Ok(())
-}
-
-fn append_xcode_arguments(arguments: &mut Vec<String>, target: &str, scheme: &str, configuration: &str) {
-    if !scheme.trim().is_empty() {
-        arguments.push("-scheme".to_string());
-        arguments.push(shell_quote(scheme));
-    } else if !target.trim().is_empty() {
-        arguments.push("-target".to_string());
-        arguments.push(shell_quote(target));
-    }
-    if !configuration.trim().is_empty() {
-        arguments.push("-configuration".to_string());
-        arguments.push(shell_quote(configuration));
+    if let Some(bundle) = profile.result_bundle_path.as_deref() {
+        if !bundle.trim().is_empty() {
+            command.push_str(&format!(" -resultBundlePath {}", shell_quote(bundle.trim())));
+        }
     }
 }
 
-fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\\\"'\\\"'"))
+/// Runs a prepared `xcodebuild` invocation in the remote project directory.
+async fn run_remote(
+    window: &tauri::Window,
+    profile: &RemoteMacProfile,
+    xcodebuild: &str,
+) -> Result<(), String> {
+    profile.validate()?;
+    profile.validate_identity_file()?;
+    let mut command = profile.ssh_command();
+    command.arg(remote_project_command(profile, xcodebuild));
+    pipe_command(&mut command, window, true).await
 }
 
 // #[tauri::command]

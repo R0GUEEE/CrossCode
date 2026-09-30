@@ -20,7 +20,11 @@ import { useParams } from "react-router";
 import { readDir, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { useIDE } from "../../utilities/IDEContext";
 import { BuildProblem, parseBuildProblems } from "../../utilities/build-results";
-import { defaultRemoteMacProfile, RemoteMacProfile } from "../../utilities/remote-mac";
+import {
+  defaultRemoteMacProfile,
+  normalizeRemoteMacProfile,
+  RemoteMacProfile,
+} from "../../utilities/remote-mac";
 
 export type WorkerLoader = () => Worker;
 
@@ -162,8 +166,8 @@ export default ({
   const workspaceSelectionKey = `workspace/${encodeURIComponent(filePath ?? "")}`;
   const [remoteMac] = useStore<RemoteMacProfile>(`${workspaceSelectionKey}/remote-mac`, defaultRemoteMacProfile);
   const buildProblems = useMemo(
-    () => parseBuildProblems(consoleLines, filePath ?? "", remoteMac.projectPath),
-    [consoleLines, filePath, remoteMac.projectPath]
+    () => parseBuildProblems(consoleLines, filePath ?? "", normalizeRemoteMacProfile(remoteMac).projectPath),
+    [consoleLines, filePath, remoteMac]
   );
   const hasAttemptedToReadOpenFiles = useRef<string | null>(null);
 

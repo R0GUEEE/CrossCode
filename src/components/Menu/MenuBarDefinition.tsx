@@ -12,7 +12,11 @@ import { restartServer } from "../../utilities/lsp-client";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useContext } from "react";
 import { UpdateContext } from "../../utilities/UpdateContext";
-import { defaultRemoteMacProfile, RemoteMacProfile } from "../../utilities/remote-mac";
+import {
+  defaultRemoteMacProfile,
+  normalizeRemoteMacProfile,
+  RemoteMacProfile,
+} from "../../utilities/remote-mac";
 
 export default [
   {
@@ -226,7 +230,7 @@ export default [
                     target,
                     scheme,
                     configuration,
-                    remoteMac,
+                    remoteMac: normalizeRemoteMacProfile(remoteMac),
                   }}
                   label="Build Selected Target"
                   useMenuItem
@@ -257,7 +261,7 @@ export default [
                     target,
                     scheme,
                     configuration,
-                    remoteMac,
+                    remoteMac: normalizeRemoteMacProfile(remoteMac),
                   }}
                   label="Build Selected Target (Release)"
                   useMenuItem
@@ -304,7 +308,7 @@ export default [
             },
             componentId: "deployMenuBtn",
           },
-          {
+                    {
             name: "Test Selected Workspace",
             shortcut: "Ctrl+U",
             component: ({ shortcut }) => {
@@ -315,17 +319,22 @@ export default [
               const [scheme] = useStore<string>(`${selectionKey}/scheme`, "");
               const [configuration] = useStore<string>(`${selectionKey}/configuration`, "Debug");
               const [remoteMac] = useStore<RemoteMacProfile>(`${selectionKey}/remote-mac`, defaultRemoteMacProfile);
+              const profile = normalizeRemoteMacProfile(remoteMac);
+              // A remote Mac runs tests with the build command: the profile
+              // chooses `xcodebuild test` there, and the button stays in sync
+              // with the "run tests on the remote Mac" switch.
+              const remoteTests = profile.enabled && profile.runTests;
               return (
                 <CommandButton
                   shortcut={shortcut}
-                  command="test_project"
+                  command={remoteTests ? "build_project" : "test_project"}
                   parameters={{
                     projectPath: path,
                     toolchainPath: selectedToolchain?.path ?? "",
                     target,
                     scheme,
                     configuration,
-                    remoteMac,
+                    remoteMac: profile,
                   }}
                   label="Test Selected Workspace"
                   useMenuItem
