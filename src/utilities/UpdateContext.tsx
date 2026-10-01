@@ -21,8 +21,9 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({
   const { addToast } = useToast();
 
   const checkForUpdates = useCallback(async () => {
-    const update = await check();
-    if (!update) return;
+    try {
+      const update = await check();
+      if (!update) return;
 
     let shouldUpdate = await dialog.ask(
       "A new update (" +
@@ -62,10 +63,16 @@ export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     );
 
-    if (shouldRelaunch) {
-      await relaunch();
+      if (shouldRelaunch) {
+        await relaunch();
+      }
+    } catch (error) {
+      console.error("Update failed:", error);
+      addToast.error(
+        error instanceof Error ? error.message : "Failed to check for or install updates"
+      );
     }
-  }, [store, storeInitialized, addToast]);
+  }, [addToast]);
 
   return (
     <UpdateContext.Provider value={{ checkForUpdates }}>
