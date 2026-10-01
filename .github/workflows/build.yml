@@ -64,8 +64,15 @@ jobs:
       - name: Install frontend dependencies
         run: bun i --frozen-lockfile
 
+      - name: Frontend typecheck and build
+        run: bun run build
+
       - name: Frontend unit tests (UI builder, Xcode importer, file system)
         run: bun test src
+
+      - name: Rust check
+        working-directory: src-tauri
+        run: cargo check --locked
 
       - name: Clean old bundles
         shell: pwsh
