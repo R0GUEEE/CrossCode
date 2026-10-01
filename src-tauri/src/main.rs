@@ -79,13 +79,16 @@ fn main() {
                 Ok(matches) => {
                     if let Some(arg) = matches.args.get("showMainWindow") {
                         if arg.value == Value::Bool(true) {
-                            let window = app.get_webview_window("main").unwrap();
-                            window.show().unwrap();
+                            let window = app
+                                .get_webview_window("main")
+                                .ok_or_else(|| "Main window is unavailable".to_string())?;
+                            window.show().map_err(|error| error.to_string())?;
+                            #[cfg(debug_assertions)]
                             window.open_devtools();
                         }
                     }
                 }
-                Err(_) => {}
+                Err(error) => eprintln!("Failed to parse CLI arguments: {error}"),
             }
 
             let store = match app.store("preferences.json") {
@@ -184,6 +187,17 @@ pub fn emit_error_and_return<T>(window: &tauri::Window, msg: &str) -> Result<T, 
 
 #[tauri::command]
 fn open_devtools(app: tauri::AppHandle) -> Result<(), String> {
-    app.get_webview_window("main").unwrap().open_devtools();
-    Ok(())
+    #[cfg(debug_assertions)]
+    {
+        let window = app
+            .get_webview_window("main")
+            .ok_or_else(|| "Main window is unavailable".to_string())?;
+        window.open_devtools();
+        Ok(())
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let _ = app;
+        Err("Developer tools are disabled in production builds".to_string())
+    }
 }
