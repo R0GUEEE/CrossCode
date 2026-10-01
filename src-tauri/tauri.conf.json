@@ -8,17 +8,8 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "resources": [
-      "templates",
-      "cpio"
-    ],
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ],
+    "resources": ["templates", "cpio"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
     "createUpdaterArtifacts": true
   },
   "productName": "CrossCode",
@@ -26,51 +17,20 @@
   "version": "0.0.5",
   "identifier": "me.nabdev.crosscode",
   "plugins": {
-    "fs": {
-      "requireLiteralLeadingDot": false
-    },
-    "cli": {
-      "args": [
-        {
-          "name": "showMainWindow"
-        }
-      ]
-    },
+    "fs": { "requireLiteralLeadingDot": false },
+    "cli": { "args": [{ "name": "showMainWindow" }] },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZFOEM1NUQyOEUzNDc5MTcKUldRWGVUU08wbFdNYmg1MHM0S3p2c2x1OFZKVnN0NXNVSDMvakExMFZnMnczamxIVGdjNGY4Mm4K",
-      "endpoints": [
-        "https://github.com/nab138/CrossCode/releases/latest/download/latest.json"
-      ]
+      "endpoints": ["https://github.com/R0GUEEE/CrossCode/releases/latest/download/latest.json"]
     }
   },
   "app": {
     "security": {
-      "csp": null
+      "csp": "default-src 'self' ipc: http://ipc.localhost; connect-src 'self' ipc: http://ipc.localhost ws: wss:; img-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-eval' blob:; worker-src 'self' blob:"
     },
     "windows": [
-      {
-        "title": "CrossCode",
-        "label": "main",
-        "width": 1000,
-        "height": 700,
-        "useHttpsScheme": true,
-        "visible": false,
-        "url": "/"
-      },
-      {
-        "title": "CrossCode (Loading)",
-        "label": "splashscreen",
-        "url": "/splash.html",
-        "width": 200,
-        "height": 250,
-        "resizable": false,
-        "decorations": false,
-        "fullscreen": false,
-        "visible": true,
-        "center": true,
-        "focus": true,
-        "backgroundColor": "#171a1c"
-      }
+      {"title":"CrossCode","label":"main","width":1000,"height":700,"useHttpsScheme":true,"visible":false,"url":"/"},
+      {"title":"CrossCode (Loading)","label":"splashscreen","url":"/splash.html","width":200,"height":250,"resizable":false,"decorations":false,"fullscreen":false,"visible":true,"center":true,"focus":true,"backgroundColor":"#171a1c"}
     ]
   }
 }
