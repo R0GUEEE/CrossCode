@@ -39,7 +39,6 @@ export default ({}: OnboardingProps) => {
   const darwinSdkRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    console.log(location.hash);
     if (location.hash === "#install-sdk" && darwinSdkRef.current) {
       darwinSdkRef.current.scrollIntoView({
         block: "start",
@@ -87,7 +86,7 @@ export default ({}: OnboardingProps) => {
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              open("https://github.com/nab138/CrossCode/issues");
+              open("https://github.com/R0GUEEE/CrossCode/issues");
             }}
           >
             github
@@ -97,7 +96,7 @@ export default ({}: OnboardingProps) => {
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              open("https://github.com/nab138/CrossCode/wiki/Troubleshooting");
+              open("https://github.com/R0GUEEE/CrossCode/wiki/Troubleshooting");
             }}
           >
             troubleshooting guide
