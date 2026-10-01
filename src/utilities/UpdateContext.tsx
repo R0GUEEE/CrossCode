@@ -1,5 +1,4 @@
-import { createContext, useCallback, useContext } from "react";
-import { StoreContext } from "./StoreContext";
+import { createContext, useCallback } from "react";
 import { check } from "@tauri-apps/plugin-updater";
 import { getVersion } from "@tauri-apps/api/app";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -17,7 +16,6 @@ export const UpdateContext = createContext<UpdateContextType>({
 export const UpdateProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { store, storeInitialized } = useContext(StoreContext);
   const { addToast } = useToast();
 
   const checkForUpdates = useCallback(async () => {
